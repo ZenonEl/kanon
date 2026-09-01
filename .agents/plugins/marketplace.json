@@ -1,0 +1,14 @@
+{
+  "name": "kanon",
+  "owner": {
+    "name": "ZenonEl"
+  },
+  "plugins": [
+    {
+      "name": "kanon",
+      "source": "./",
+      "version": "0.1.0",
+      "description": "Acceptance checklists for coding agents: observable results and their proofs, written before production starts"
+    }
+  ]
+}
