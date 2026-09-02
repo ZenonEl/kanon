@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+"""Разбор формата чеклиста. Общий модуль для линтера, приёмки и хуков.
+
+Формат описан в SPEC/FORMAT.md и является источником истины. Машинные ключи —
+фиксированный ASCII, человеческие подписи свободны: чеклист пишется на языке
+автора, а разбирается одинаково. Новый язык добавляется строкой в таблицу
+псевдонимов, канонический ключ при этом не меняется.
+
+The format is described in SPEC/FORMAT.md, which is the source of truth. Machine
+tokens are fixed ASCII, human labels are free: a checklist is written in its
+author's language and parsed the same way regardless. A new language is added by
+extending the alias table; canonical keys never change.
+"""
+from __future__ import annotations
+
+import datetime as _dt
+import pathlib
+import re
+from dataclasses import dataclass, field
+
+CHECKLIST_DIR = ".kanon"
+
+# --- псевдонимы / aliases -------------------------------------------------
+
+SECTIONS: dict[str, tuple[str, ...]] = {
+    "gathered": ("gathered", "собрано", "из собранного"),
+    "acceptance": ("acceptance", "приёмка", "приемка"),
+    "failures": ("failures", "провалы"),
+}
+
+FIELD_ALIASES: dict[str, tuple[str, ...]] = {
+    "check": ("check", "проверка"),
+    "proof": ("proof", "подтв", "подтверждено"),
+    "tried": ("tried", "пробовал"),
+    "returned": ("returned", "вернулось"),
+    "req": ("req",),
+}
+
+NO_CHECK = ("[no check]", "[без проверки]")
+
+# Пустые утверждения, выдаваемые за доказательство. Список принципиально
+# неполон: машина ловит самые ленивые случаи, отличить отчёт от «подтверждено:
+# сделано» может только человек.
+EMPTY_PROOF = {
+    "done", "ok", "okay", "works", "working", "checked", "fixed", "yes", "good",
+    "готово", "сделано", "работает", "проверил", "проверено", "исправлено", "да",
+}
+MIN_PROOF_LEN = 6
+
+_FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+_HEADING = re.compile(r"^##\s+(.+?)\s*$")
+_ITEM = re.compile(r"^-\s*\[([ xX])\]\s*(\d+)\.\s*(.*)$")
+_FAILURE = re.compile(r"^\[!\]\s*(\d+)\s*·?\s*(.*)$")
+_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+_FIELD_LOOKUP = {a: key for key, aliases in FIELD_ALIASES.items() for a in aliases}
+_SECTION_LOOKUP = {a: key for key, aliases in SECTIONS.items() for a in aliases}
+
+
+@dataclass
+class Item:
+    number: int
+    ticked: bool
+    text: str
+    fields: dict[str, str] = field(default_factory=dict)
+    no_check: bool = False
+    line: int = 0
+
+    @property
+    def has_proof(self) -> bool:
+        value = self.fields.get("proof", "").strip()
+        if not value:
+            return False
+        bare = value.strip(" .!·").lower()
+        return bare not in EMPTY_PROOF and len(bare) >= MIN_PROOF_LEN
+
+    @property
+    def empty_slot(self) -> bool:
+        return not self.text.strip()
+
+    @property
+    def closed(self) -> bool:
+        return self.ticked and self.has_proof
+
+
+@dataclass
+class Checklist:
+    path: pathlib.Path
+    meta: dict[str, str] = field(default_factory=dict)
+    gathered: list[str] = field(default_factory=list)
+    items: list[Item] = field(default_factory=list)
+    failures: list[tuple[int, str]] = field(default_factory=list)
+    had_gathered_section: bool = False
+
+    # --- выведенное состояние / derived state ---
+
+    @property
+    def closed_on(self) -> str:
+        value = (self.meta.get("closed") or "").strip()
+        return "" if value in ("", "null", "none", "-") else value
+
+    @property
+    def state(self) -> str:
+        if self.closed_on:
+            return "closed"
+        try:
+            age = _dt.date.today() - _dt.date.fromtimestamp(self.path.stat().st_mtime)
+            if age.days >= 14 and self.open_items:
+                return "stale"
+        except OSError:
+            pass
+        return "open"
+
+    @property
+    def open_items(self) -> list[Item]:
+        return [i for i in self.items if not i.closed]
+
+    @property
+    def ticked_without_proof(self) -> list[Item]:
+        return [i for i in self.items if i.ticked and not i.has_proof]
+
+    @property
+    def unchecked(self) -> list[Item]:
+        return [i for i in self.items if i.no_check]
+
+    @property
+    def empty_slots(self) -> list[Item]:
+        return [i for i in self.items if i.empty_slot]
+
+    @property
+    def expires_in(self) -> int | None:
+        """Дней до истечения тары. None — не истекает."""
+        if not self.closed_on or not _DATE.match(self.closed_on):
+            return None
+        closed = _dt.date.fromisoformat(self.closed_on)
+        return 7 - (_dt.date.today() - closed).days
+
+
+def _split_fields(tail: str) -> tuple[str, dict[str, str], bool]:
+    """Разобрать хвост строки пункта на текст, поля и метку «без проверки»."""
+    no_check = False
+    for marker in NO_CHECK:
+        if marker in tail.lower():
+            no_check = True
+            tail = re.sub(re.escape(marker), "", tail, flags=re.I)
+    parts = [p.strip() for p in tail.split("·")]
+    text = parts[0] if parts else ""
+    fields: dict[str, str] = {}
+    for part in parts[1:]:
+        key, sep, value = part.partition(":")
+        if not sep:
+            continue
+        canonical = _FIELD_LOOKUP.get(key.strip().lower())
+        if canonical:
+            fields[canonical] = value.strip().strip("*")
+    return text.strip("*").strip(), fields, no_check
+
+
+def parse(path: pathlib.Path) -> Checklist:
+    text = path.read_text(encoding="utf-8")
+    doc = Checklist(path=path)
+
+    m = _FRONTMATTER.match(text)
+    if m:
+        for line in m.group(1).splitlines():
+            key, sep, value = line.partition(":")
+            if sep:
+                doc.meta[key.strip().lower()] = value.strip()
+        text = text[m.end():]
+        offset = m.group(0).count("\n")
+    else:
+        offset = 0
+
+    section = ""
+    for n, raw in enumerate(text.splitlines(), start=offset + 1):
+        heading = _HEADING.match(raw)
+        if heading:
+            section = _SECTION_LOOKUP.get(heading.group(1).strip().lower(), "")
+            if section == "gathered":
+                doc.had_gathered_section = True
+            continue
+
+        if section == "gathered" and raw.strip().startswith("-"):
+            doc.gathered.append(raw.strip()[1:].strip())
+            continue
+
+        if section == "acceptance":
+            item = _ITEM.match(raw.strip())
+            if item:
+                body, fields, no_check = _split_fields(item.group(3))
+                doc.items.append(Item(
+                    number=int(item.group(2)),
+                    ticked=item.group(1).lower() == "x",
+                    text=body,
+                    fields=fields,
+                    no_check=no_check,
+                    line=n,
+                ))
+            continue
+
+        if section == "failures":
+            fail = _FAILURE.match(raw.strip())
+            if fail:
+                doc.failures.append((int(fail.group(1)), fail.group(2).strip()))
+
+    return doc
+
+
+def find(root: pathlib.Path | None = None) -> list[pathlib.Path]:
+    root = root or pathlib.Path.cwd()
+    directory = root / CHECKLIST_DIR
+    if not directory.is_dir():
+        return []
+    return sorted(p for p in directory.glob("*.md") if p.is_file())

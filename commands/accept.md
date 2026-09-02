@@ -1,22 +1,25 @@
 ---
-description: Приёмка — прогнать чеклист целиком и сказать, закончено или нет
-argument-hint: Опционально имя чеклиста
+description: Acceptance — run the whole checklist and say whether it is finished
+argument-hint: Optionally the checklist name
 ---
 
-Используй навык **kanon:task-to-checklist**.
+Use the **kanon:task-to-checklist** skill.
 
-Прогони файл, не память. Покажи:
+Run the file, not your memory. Report:
 
-- закрыто доказательством — сколько из скольких;
-- закрыто отметкой без доказательства — это открытые;
-- помечено `[без проверки]`;
-- пустые слоты;
-- пункты, которые падали, и что вернулось.
+- closed with proof — how many of how many;
+- ticked without proof — these are open;
+- marked `[no check]`;
+- empty slots;
+- items that failed and what came back.
 
-Доказательства печатай дословно: линтер видит только непустоту, отличить отчёт
-от «подтверждено: сделано» может лишь человек.
+Print proofs **verbatim**: the linter sees only non-emptiness, and telling a
+report from "confirmed: done" is a person's job.
 
-«Сделано» звучит, только когда первое равно общему числу. Иначе — перечисли
-недостачу.
+"Done" is only said when the first number equals the total. Otherwise list the
+shortfall.
+
+Start with `python3 scripts/check-checklist.py` — it refuses ticks without proof
+and slot counts that do not match.
 
 $ARGUMENTS

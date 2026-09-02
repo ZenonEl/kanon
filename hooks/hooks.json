@@ -1,0 +1,41 @@
+{
+  "description": "kanon fires on events, not only on phrasing: surfaces stale checklists at session start, reminds once when production begins with no checklist, and lists unclosed items before stopping. Nothing blocks.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/kanon-hook.py\" SessionStart",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/kanon-hook.py\" PreToolUse",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/kanon-hook.py\" Stop",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

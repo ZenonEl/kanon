@@ -1,30 +1,34 @@
-# Установка
+# Install
 
-**Лицензия:** CC BY-SA 4.0
+**License:** CC BY-SA 4.0 · Russian: [`INSTALL.ru.md`](INSTALL.ru.md)
 
-Один репозиторий обслуживает два хоста. Разница между ними существенная, и её
-стоит знать до установки.
+One repository serves two hosts. The difference between them matters and is
+worth knowing before you install.
 
 | | Claude Code | Codex |
 |---|---|---|
-| Точка входа | скилы **и** слэш-команды | **только скилы** |
-| Манифест | `.claude-plugin/plugin.json` | `.codex-plugin/plugin.json` |
-| Маркетплейс | `.claude-plugin/marketplace.json` | `.agents/plugins/marketplace.json` |
+| Entry points | skills **and** slash commands | **skills only** |
+| Manifest | `.claude-plugin/plugin.json` | `.codex-plugin/plugin.json` |
+| Marketplace | `.claude-plugin/marketplace.json` | `.agents/plugins/marketplace.json` |
+| Hooks | shipped by the plugin | not available |
 
-Слэш-команд в Codex нет как класса. Поэтому вся работа kanon доступна через
-скил `task-to-checklist`, а команды `/kanon:*` — лишь удобные ярлыки поверх
-него. Под Codex тот же результат достигается словами.
+Codex has no slash commands as a class. All of kanon's work is therefore
+reachable through the `task-to-checklist` skill; the `/kanon:*` commands are
+shortcuts over it. Under Codex the same result is reached in words, and the
+scripts are run directly.
+
+Requirements: Python 3.10+ for the scripts and hooks. Nothing else.
 
 ## Claude Code
 
-### Из маркетплейса
+### From the marketplace
 
 ```
 /plugin marketplace add ZenonEl/kanon
 /plugin install kanon@kanon
 ```
 
-### Локально, для разработки
+### Locally, for development
 
 ```
 git clone https://github.com/ZenonEl/kanon.git
@@ -32,16 +36,16 @@ git clone https://github.com/ZenonEl/kanon.git
 /plugin install kanon@kanon
 ```
 
-### Проверить, что встало
+### Verify
 
 ```
 /plugin
 ```
 
-`kanon` должен быть в списке включённых. Дальше — в свежей сессии, **не называя
-плагин**, сказать что-нибудь вроде «собрали материал, теперь делай». Скил должен
-подняться сам. Если не поднимается — проблема в маршрутизации, а не в файлах:
-см. раздел ниже.
+`kanon` should be listed as enabled. Then, in a fresh session and **without
+naming the plugin**, say something like "we gathered the material, now build
+it". The skill should raise itself. If it does not, the problem is routing, not
+the files — see below.
 
 ## Codex
 
@@ -49,41 +53,60 @@ git clone https://github.com/ZenonEl/kanon.git
 git clone https://github.com/ZenonEl/kanon.git ~/.codex/plugins/kanon
 ```
 
-Либо, если хост читает маркетплейсы, указать на `.agents/plugins/marketplace.json`.
+Or point the host at `.agents/plugins/marketplace.json` if it reads
+marketplaces.
 
-Проверка та же: в свежей сессии произнести фразу из триггеров и убедиться, что
-скил поднялся.
+Hooks do not run under Codex. The skill works, and `check-checklist.py` and
+`sweep.py` are run by hand or from your own CI.
 
-## Если скил не срабатывает
+## What the hooks do
 
-Порядок диагностики — от самого частого к самому редкому:
+Shipped in `hooks/hooks.json` and active in Claude Code only. **None of them
+block anything** — they only speak.
 
-1. **Скила нет в списке.** Тогда дело не в описании, а в размещении: путь
-   `skills/<name>/SKILL.md`, `SKILL.md` заглавными, валидный YAML во
-   frontmatter, каталог существовал на момент старта сессии.
-2. **Скил есть, но не поднимается.** Дело в `description`: маршрутизация читает
-   только его, тело скила при этом не читается вовсе. Фразы, которыми вы реально
-   говорите, должны быть в описании дословно.
-3. **Поднимается не тогда.** Порог описан в скиле: kanon молчит на мелких
-   правках намеренно. Это не поломка.
+| Event | When it speaks |
+|---|---|
+| `SessionStart` | a checklist is stale, or a closed one has expired |
+| `PreToolUse` on a write | gathering happened, no checklist exists, production started — **once per session** |
+| `Stop` | open items remain; lists them |
 
-Проверка формы — машинная:
+The pre-write reminder deliberately stays silent when: an open checklist already
+exists, the write targets `.kanon/` itself, fewer than three gathering
+operations happened in the session, or it already spoke once.
+
+A hook that fails exits 0 and says nothing. A broken hook is worse than no hook.
+
+## If the skill does not fire
+
+Diagnose in this order, most common first:
+
+1. **The skill is not in the list.** Then it is placement, not wording: the path
+   is `skills/<name>/SKILL.md`, `SKILL.md` in capitals, valid YAML frontmatter,
+   and the directory existed when the session started.
+2. **Listed but not raised.** Then it is the `description`: routing reads only
+   that, and never the body. The phrases you actually say must appear in it
+   verbatim, in your language.
+3. **Raised at the wrong time.** The threshold is documented in the skill: kanon
+   stays silent on small edits by design. That is not a fault.
+
+Form is checked mechanically:
 
 ```
 python3 scripts/check-skills.py
 ```
 
-Она видит только форму: наличие файла, frontmatter, обязательные поля, длину
-описания. Содержательное качество описания она не проверяет и не должна.
+It sees form only — file, frontmatter, required fields, description length.
+Whether a live phrase raises the skill it cannot know. That is measured by a run
+(`claude plugin eval`, currently in early access) or by keeping a log.
 
-## Рабочие файлы
+## Working files
 
-Чеклисты пишутся в `.kanon/` в корне рабочего проекта и **не коммитятся**:
-это леса, а не результат. Добавьте в `.gitignore` проекта:
+Checklists are written to `.kanon/` in the working project root and are **not
+committed**: scaffolding, not results. Add to the project's `.gitignore`:
 
 ```
 .kanon/
 ```
 
-В самом репозитории kanon это уже сделано, и CI отдельно проверяет, что
-`.kanon/` не уехал под версионный контроль.
+Done already in this repository, and CI checks separately that `.kanon/` never
+entered version control.

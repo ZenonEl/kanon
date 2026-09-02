@@ -1,6 +1,6 @@
 # kanon
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/code-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](SPEC/LICENSE)
 
@@ -76,6 +76,29 @@ gathering, before the first line of production — for exactly that reason.
 The boundary is deliberate. A tool that promises more than it verifies is worse
 than no tool: a green list starts being read as a guarantee.
 
+## Sensors, not just rules
+
+A rule nobody enforces holds for about a week. So the checkable rules are
+checked by a program, and the tool fires on events rather than on phrasing.
+
+| Piece | What it does |
+|---|---|
+| `scripts/check-checklist.py` | refuses `[x]` without proof, proof from the stop list of empty affirmations, a slot count that does not match, a failure pointing at a missing item |
+| `scripts/sweep.py` | derives lifetime — `open` / `closed` / `stale` — and proposes an outcome. Deletes nothing by itself |
+| `hooks/` | speaks at session start (stale, expired), once before production begins with no checklist, and at stop with the open items |
+
+**Nothing blocks.** A hook that gets in the way is uninstalled along with the
+plugin, and a hook that crashes is worse than none — so any internal error exits
+0 in silence. The pre-write reminder speaks once per session.
+
+## Languages
+
+Write the checklist in whatever language you work in. Only the machine tokens
+are fixed ASCII — `check:`, `proof:`, `tried:`, `returned:`, `[no check]` and
+the section names — and each has documented aliases per language, so the linter
+parses either. English and Russian ship today; a new language is one row in the
+alias table.
+
 ## Install
 
 See [`docs/INSTALL.md`](docs/INSTALL.md) for Claude Code and Codex.
@@ -84,9 +107,9 @@ See [`docs/INSTALL.md`](docs/INSTALL.md) for Claude Code and Codex.
 
 | Document | What is in it |
 |---|---|
-| [`SPEC/FORMAT.md`](SPEC/FORMAT.md) | normative file format, states, lifetime |
-| [`docs/CONCEPTS.md`](docs/CONCEPTS.md) | why it is built this way — harness, guides and sensors, proof over ticks |
-| [`docs/INSTALL.md`](docs/INSTALL.md) | installation for both hosts |
+| [`SPEC/FORMAT.md`](SPEC/FORMAT.md) | normative file format, states, lifetime ([ru](SPEC/FORMAT.ru.md)) |
+| [`docs/CONCEPTS.md`](docs/CONCEPTS.md) | why it is built this way — harness, guides and sensors, proof over ticks ([ru](docs/CONCEPTS.ru.md)) |
+| [`docs/INSTALL.md`](docs/INSTALL.md) | installation for both hosts, what the hooks do ([ru](docs/INSTALL.ru.md)) |
 | [`skills/task-to-checklist/SKILL.md`](skills/task-to-checklist/SKILL.md) | the behaviour itself |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | versioning, CI, how to change things |
 

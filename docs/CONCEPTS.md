@@ -1,234 +1,260 @@
-# Концепты
+# Concepts
 
-**Лицензия:** CC BY-SA 4.0
+**License:** CC BY-SA 4.0 · Russian: [`CONCEPTS.ru.md`](CONCEPTS.ru.md)
 
-Документ объясняет, почему kanon устроен именно так. Формат файла описан в
-[`SPEC/FORMAT.md`](../SPEC/FORMAT.md), поведение — в
+Why kanon is built this way. The file format is normative in
+[`SPEC/FORMAT.md`](../SPEC/FORMAT.md); the behaviour lives in
 [`skills/task-to-checklist/SKILL.md`](../skills/task-to-checklist/SKILL.md).
-Здесь — рассуждение, из которого оба выведены.
+This document is the reasoning both are derived from.
 
 ---
 
-## 1. Харнес: где вообще живёт эта проблема
+## 1. The harness: where this problem lives
 
-**Агент = модель + харнес.** Харнес — всё, что не модель: цикл, инструменты,
-контекст, память, инструкции, проверки, ограничения, изоляция, логи.
+**Agent = model + harness.** The harness is everything that is not the model:
+the loop, tools, context, memory, instructions, checks, permissions, isolation,
+logs.
 
-Модель сама по себе не помнит ничего между вызовами и ничего не делает в мире.
-Всё, что выглядит как компетентность агента, распределено между двумя слоями, и
-качество работы определяется обоими. Одна и та же модель в разной обвязке даёт
-разные результаты — на публичных бенчмарках разброс сопоставим со сменой
-поколения модели.
+A model remembers nothing between calls and does nothing in the world. Anything
+that looks like an agent's competence is split across both layers, and the
+quality of the work depends on both. The same model in a different harness
+scores differently — on public benchmarks the spread rivals a change of model
+generation.
 
-Практическое следствие: когда агент сделал не то, вопрос «модель тупая?» почти
-всегда преждевременный. Сначала пять других:
+The practical consequence: when an agent does the wrong thing, "is the model
+stupid?" is almost always premature. Five other questions come first.
 
-| # | Вопрос | Слой |
+| # | Question | Layer |
 |---|---|---|
-| 1 | Он вообще знал правило? | guides — инструкции, правила проекта |
-| 2 | Он мог узнать, что сделал плохо? | **сенсоры — проверки, которые падают** |
-| 3 | Он видел нужное? | контекст |
-| 4 | У него было чем? | инструменты и права |
-| 5 | Всё выше «да»? | вот теперь модель |
+| 1 | Did it know the rule at all? | guides — instructions, project rules |
+| 2 | Could it learn that it did badly? | **sensors — checks that go red** |
+| 3 | Could it see what it needed? | context |
+| 4 | Did it have the means? | tools and permissions |
+| 5 | All of the above yes? | now the model |
 
-kanon целиком живёт в пунктах 2 и 3.
+kanon lives entirely in 2 and 3.
 
-## 2. Guides и sensors
+## 2. Guides and sensors
 
-Разделение из практики харнес-инжиниринга: харнес говорит с агентом двумя
-способами.
+A harness speaks to an agent two ways.
 
-- **Guides** направляют **до** действия: правила проекта, описания инструментов,
-  инструкции, скиллы.
-- **Sensors** наблюдают **после** и позволяют самому исправиться: тесты,
-  линтеры, хуки, скриншоты, судья.
+- **Guides** steer **before** the act: project rules, tool descriptions,
+  instructions, skills.
+- **Sensors** observe **after** and let it self-correct: tests, linters, hooks,
+  screenshots, a judge.
 
-Каждый бывает **вычислительным** (детерминированная проверка) или
-**инференсным** (семантическая оценка).
+Either can be **computational** (a deterministic check) or **inferential** (a
+semantic judgement).
 
-Ключевое: **цикл имеет смысл только если между попытками что-то улучшается.**
-Агент с двадцатью инструментами и без единого сенсора не тупит — он летит
-вслепую и генерирует правдоподобные черновики двадцатью способами.
+The key point: **a loop only means something if something improves between
+attempts.** An agent with twenty tools and no sensor is not being stupid — it is
+flying blind and generating plausible drafts twenty ways.
 
-Типичный перекос в реальных сетапах: guides развесистые, сенсоров нет. Лечат
-обычно тоже guides — дописывают ещё абзац в инструкции. Не помогает, потому что
-проблема не в том, что агент не знал.
+The typical imbalance in real setups: elaborate guides, no sensors. And the
+usual cure is more guides — another paragraph of instructions. It does not help,
+because not knowing was never the problem.
 
-**kanon — это способ завести сенсор там, где его завести обычно ленятся:**
-на приёмке результата, а не на синтаксисе кода.
+**kanon puts a sensor where people usually skip it:** on the acceptance of a
+result, not on the syntax of the code.
 
-## 3. Почему приёмка — это отдельная сущность, а не часть плана
+## 3. Why acceptance is separate from the plan
 
-План отвечает на вопрос **«как делать»**. Чеклист — на вопрос **«как пойму, что
-сделано»**.
+A plan answers **"how to do it"**. A checklist answers **"how will I know it is
+done"**.
 
-Их постоянно путают, потому что оба выглядят как список. Но это списки разной
-природы:
+They get confused because both look like lists. They are lists of different
+kinds:
 
-| | План | Чеклист приёмки |
+| | Plan | Acceptance checklist |
 |---|---|---|
-| Единица | действие | наблюдаемый результат |
-| Проверяется | выполнением | доказательством |
-| Отвечает | что делать дальше | закончено ли |
-| Живёт | до конца работы | до истечения тары |
+| Unit | an action | an observable result |
+| Verified by | doing it | proof |
+| Answers | what to do next | whether it is finished |
+| Lives | until the work ends | until the container expires |
 
-Наличие подробного плана **не** даёт приёмки. Самый частый вид провала выглядит
-именно так: план расписан детально, каждый шаг выполнен, результат всё равно
-мимо — потому что вопрос «как пойму, что сделано» никто не задавал.
+A detailed plan does **not** supply acceptance. The most common failure looks
+exactly like that: the plan was thorough, every step executed, the result still
+wrong — because nobody asked how they would know.
 
-## 4. Доказательство вместо отметки
+## 4. Proof instead of a tick
 
-Главное правило kanon и единственное, без которого он вырождается:
+The central rule, and the one without which everything else rots:
 
-> Пункт закрывается **вставкой доказательства**, а не отметкой.
+> An item is closed by **inserting proof**, not by ticking a box.
 
-Причина не в дисциплине, а в проверяемости. Отметка `[x]` — утверждение агента о
-собственной работе, и возразить ему нечем. Строка `коммит a1b2c3d + скрин
-out/screens/07.png` — проверяемый факт: можно открыть и посмотреть.
+The reason is verifiability, not discipline. A `[x]` is the agent's claim about
+its own work and there is nothing to argue against it. `commit a1b2c3d +
+out/screens/07.png` is a checkable fact: you can open it and look.
 
-Это тот же принцип, на котором стоят требования в mnemo: «сделано» без
-доказательства — мнение, а не отчёт.
+The caveat to keep in mind: **a machine can only check non-emptiness.**
+"confirmed: done" is formally non-empty. Telling proof from its imitation is a
+person's job — which is why acceptance prints proofs verbatim instead of
+reporting that they exist.
 
-Оговорка, которую надо держать в голове: **машина проверяет только непустоту**.
-Строка «подтверждено: сделано» формально непуста. Отличить доказательство от его
-имитации может только человек — поэтому приёмка печатает доказательства
-дословно, а не сообщает, что они «есть».
+`scripts/check-checklist.py` refuses the laziest cases via a stop list, in every
+supported language. That is a floor, not a guarantee.
 
-## 5. Почему пункт без проверки разрешён
+## 5. Why an unchecked item is allowed
 
-Соблазн — запретить. Тогда чеклист заводить перестанут: часть работы честно
-проверяется только глазами, и требование «дай команду для проверки вкуса»
-превращает инструмент в помеху.
+The temptation is to forbid it. Then people stop writing checklists: part of any
+work is honestly verified only by eye, and demanding "give me a command that
+checks taste" turns the tool into an obstacle.
 
-Компромисс: **пункт без проверки разрешён, но помечен** `[без проверки]`, и в
-приёмке видно, какая доля результата ничем не подтверждается.
+The compromise: **an unchecked item is allowed but marked** `[no check]`, and
+acceptance shows what share of the result rests on nothing.
 
-Три из пяти без проверки — это не чеклист, а список намерений. Но узнать об этом
-до сдачи полезнее, чем не завести чеклист вовсе.
+Three out of five unchecked is a list of intentions, not a checklist. Learning
+that before delivery beats not writing one at all.
 
-## 6. Число в задаче становится числом слотов
+## 6. A number in the task becomes a number of slots
 
-«Несколько вариантов», «десять экранов», «все роуты» — самая тихая категория
-провалов. Никто не считает, и недостача не видна: сделан один вариант, и он
-выглядит как работа.
+"Several variants", "ten screens", "all routes" — the quietest class of failure.
+Nobody counts, and the shortfall is invisible: one variant got made and it looks
+like work.
 
-Слот решает это механически. Десять экранов — десять поимённых строк. Пустая
-строка видна; намерение «сколько получится» — нет.
+A slot fixes this mechanically. Ten screens, ten named lines. The `slots:` field
+records what the task asked for so a machine can compare. An empty line is
+visible; an intention is not.
 
-Это простейший из возможных сенсоров и один из самых полезных.
+The simplest sensor available, and among the most useful.
 
-## 7. Провал оставляет след
+## 7. A failure leaves a trace
 
-Провалившийся пункт не переделывают молча. Он оставляет две строки: **что
-пробовал** и **что вернулось дословно**.
+A failed item is not redone quietly. It leaves two fields: **what was tried**
+and **what came back, verbatim**.
 
-Причина прикладная: без записи третья попытка не знает про первые две, и работа
-идёт по кругу — особенно после смены сессии, когда предыдущие попытки уже не в
-контексте.
+The practical reason: without a record the third attempt knows nothing of the
+first two and the work circles — especially after a session change, when earlier
+attempts are no longer in context.
 
-Причина глубже: «застрял» без описанной попытки неотличимо от «не докопался».
-Первое требует чужого действия, второе — ещё одного подхода. Выглядят они
-одинаково, а стоят разного.
+The deeper reason: "stuck" with no attempt described is indistinguishable from
+"did not dig". The first needs someone else to act, the second needs one more
+try. They look identical and cost differently.
 
-## 8. Срок жизни: истекает тара, а не содержимое
+## 8. Lifetime: the container expires, the content does not
 
-Чеклист эфемерен по природе: задача живёт полдня, а файлов накапливается по
-двести в месяц. Без срока жизни каталог превращается в свалку, и его перестают
-открывать.
+A checklist is ephemeral by nature: a task lives half a day, and files
+accumulate by the hundred. Without a lifetime the directory becomes a dump and
+people stop opening it.
 
-Но простое самоудаление ломает главное: **доказательство умрёт вместе с
-файлом**, а доказательство — весь смысл.
+But plain self-deletion breaks the point: **the proof would die with the file**,
+and the proof is the whole purpose.
 
-Отсюда правило: к моменту истечения всё ценное обязано жить не здесь — в
-коммите, в требовании заказчика, в findings-log. Файл — леса, а не здание.
+Hence the rule: by expiry everything valuable must live elsewhere — in a commit,
+in a requirement, in a findings log. The file is scaffolding, not a building.
 
-Срок считается **от закрытия**, не от создания: иначе чеклист умрёт посреди
-работы.
+The clock starts at **closing**, not at creation; otherwise a checklist dies
+mid-work.
 
-### Истечение как сенсор
+### Expiry as a sensor
 
-Побочный эффект, который оказался ценнее самой уборки:
+A side effect that turned out worth more than the tidying:
 
-> Если файл **жалко удалять** — значит доказательство никуда не переехало,
-> то есть работа не закрыта.
+> If the file feels **too valuable to delete**, the proof never moved anywhere —
+> which means the work is not closed.
 
-Это повод не продлять срок, а спросить, почему ценное до сих пор только здесь.
-Уборка бесплатно превращается в проверку.
+That is a reason to ask why, not to extend the deadline. Housekeeping becomes a
+check for free.
 
-### Брошенный чеклист показывается, а не удаляется
+### A stale checklist is surfaced, not dropped
 
-Четырнадцать дней без движения при открытых пунктах — не повод для тихого
-удаления. Молчаливо стереть незакрытый чеклист значит стереть ровно ту
-недостачу, ради которой он заводился.
+Fourteen days idle with open items is not grounds for quiet deletion. Dropping an
+unclosed checklist erases exactly the shortfall it exists to show.
 
-Общее правило, действующее во всех трёх местах: **молчаливое удаление
-запрещено**. Всё, что уходит, уходит видимо.
+The general rule, applied in all three places: **silent deletion is forbidden.**
+Whatever leaves, leaves visibly.
 
-## 9. Порог: когда инструмент обязан молчать
+## 9. The threshold: when the tool must stay quiet
 
-Скилл, срабатывающий на «поправь опечатку», выключают на второй день. Порог —
-не удобство, а условие выживания инструмента.
+A skill that fires on "fix this typo" is switched off on the second day. The
+threshold is not a convenience — it is a survival condition for the tool.
 
-Запуск оправдан, когда выполнено хотя бы одно:
+Acting is justified when at least one holds: the task followed a gathering
+phase; the task names a number; the work spans more than one step and someone
+will accept it. Otherwise, silence.
 
-- задаче предшествовал **сбор** (читались файлы, шёл поиск, приходил материал);
-- в формулировке есть **число**;
-- работа рассчитана больше чем на один шаг и её результат кто-то примет.
+## 10. Context: why the file is written early
 
-Ничего из этого нет — молчать.
+The most common form of failure looks like carelessness and is a loss of
+context.
 
-## 10. Контекст: почему файл пишется рано
+Gathering eats the window. Production starts afterwards and runs on the
+remainder. "Did it from memory" describes this literally: the agent did not
+ignore the material, it cannot see it.
 
-Самая частая форма провала выглядит как невнимательность, а является потерей
-контекста.
+Compaction keeps the current task, recent errors and file names; it loses
+original instructions, intermediate decisions and rules. An instruction spoken
+once mid-session does not survive to the end of the work.
 
-Сбор материала съедает окно. Производство начинается после — и идёт уже по
-остаткам. Формулировка «делал по памяти» описывает это буквально: агент не
-проигнорировал собранное, он его не видит.
+Hence: **the file is filled in while the context is fresh** — right after
+gathering, before the first line of production. From then on it is the source,
+and the work survives compaction, a new session and a change of hands.
 
-Компакция сохраняет текущую задачу, свежие ошибки и имена файлов; теряет
-исходные инструкции, промежуточные решения и правила. Указание, произнесённое
-один раз в середине сессии, до конца работы не доживает.
+Research on agent memory arrives at the same principle independently: keep
+structured state instead of a growing history. The difference is that here it is
+applied by hand and from outside the runtime, because the runtime belongs to
+someone else.
 
-Отсюда требование: **файл заполняется, пока контекст свежий** — сразу после
-сбора, до первой строки производства. Дальше он и есть источник, и работа
-переживает и сжатие, и новую сессию, и смену исполнителя.
+## 11. Firing on events, not on phrasing
 
-Тот же принцип independently сформулирован в исследованиях агентской памяти:
-хранить структурированное состояние вместо растущей истории. Разница в том, что
-здесь он применяется вручную и снаружи рантайма — потому что рантайм чужой и
-переписать его нельзя.
+A skill is raised when the move from gathering to producing is announced in
+words. It is not always announced: an agent often crosses the boundary silently.
 
-## 11. Что kanon сознательно не делает
+That gap is why kanon ships hooks. They see events rather than formulations:
 
-**Не судит о вкусе.** «Взял первое, что пришло» — не недостача в списке.
-Типовое решение из обучения (дефолтная палитра, шаблонная композиция) сюда не
-ловится. Это ограничение, которое ставится в задаче, а не пункт приёмки.
+- **SessionStart** — what is stale and what expired;
+- **PreToolUse** on a write — gathering happened, no checklist exists, and
+  production has begun: say so, **once per session**;
+- **Stop** — items are still open: list them.
 
-**Не проверяет качество разложения.** Чеклист меряет полноту относительно того,
-что в него выписали, а не относительно того, что было нужно. Плохо разложенная
-задача даёт зелёный чеклист на плохом разложении.
+Three constraints, expensive to violate:
 
-Это принципиальный предел, и он того же класса, что тест, зелёный при любом
-исходе. Лечится единственным способом — вторым взглядом на сам чеклист **до**
-начала работы: человеком, вторым агентом, ревьюером.
+1. **Nothing blocks.** A hook that gets in the way is uninstalled along with the
+   plugin. All three only speak.
+2. **A hook never crashes.** Any internal error means exit 0 and silence: a
+   broken hook is worse than none, because it breaks someone else's work.
+3. **The pre-write reminder speaks once.** A reminder on every write is noise,
+   and noise stops being read.
 
-**Не заменяет ревью.** Закрытый чеклист означает «ничего не забыто», а не
-«сделано хорошо».
+## 12. Language
 
-Граница проведена намеренно. Инструмент, обещающий больше, чем проверяет, вреден
-сильнее отсутствующего: зелёный список начинают читать как гарантию качества.
+A checklist is written in the language its author works in. Only the machine
+tokens are fixed ASCII, each with documented per-language aliases.
 
-## 12. Место в связке
+The alternative — one working language — would be a smaller tool. Forcing a
+language on someone to satisfy a parser is a parser problem, not a user problem.
 
-kanon самодостаточен и не требует ничего, кроме каталога.
+## 13. What kanon deliberately does not do
 
-Если рядом есть архив требований заказчика (mnemo), связь односторонняя: пункт
-приёмки может нести идентификатор требования, и тогда закрытый пункт даёт
-готовое доказательство для отметки требования сделанным.
+**It does not judge taste.** A default palette, a templated composition, the
+modal answer from training — not a shortfall in a list. That is a constraint
+stated in the task.
 
-Это закрывает известную слабость: доказательство требования обычно пишется в
-конце и по памяти — то есть тем самым способом, против которого весь инструмент
-и заводился. Доказательство, накопленное по ходу работы, честнее вспомненного.
+**It does not check the quality of the decomposition.** The checklist measures
+completeness against what was written into it, not against what was needed. A
+badly split task yields a green checklist over a bad split.
 
-Обратной зависимости нет: mnemo про kanon не знает и знать не обязан.
+This limit is structural — the same class as a test that passes either way — and
+is cured only one way: a second pair of eyes on the checklist itself, before the
+work starts.
+
+**It does not replace review.** A closed checklist means *nothing was
+forgotten*, not *this is good*.
+
+The boundary is deliberate. A tool that promises more than it verifies is worse
+than no tool: a green list starts being read as a guarantee.
+
+## 14. Where it sits
+
+kanon is self-contained and needs nothing but a directory.
+
+If a citable archive of client material and requirements sits alongside, the
+link is one-way: an acceptance item may carry a requirement identifier, and a
+closed item then yields ready evidence for that requirement.
+
+That closes a known weakness of such archives: evidence is usually written at
+the end and from memory — the very method this tool exists to replace. Evidence
+accumulated during the work is more honest than evidence recalled afterwards.
+
+There is no reverse dependency: the archive does not know about kanon and does
+not need to.

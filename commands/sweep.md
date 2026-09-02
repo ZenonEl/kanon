@@ -1,18 +1,18 @@
 ---
-description: Срок жизни — что истекло, что вытащить, что показать
+description: Lifetime — what expired, what to extract, what to surface
 ---
 
-Используй навык **kanon:task-to-checklist**.
+Use the **kanon:task-to-checklist** skill.
 
-Пройди `.kanon/` и раздели по выведенному состоянию (`SPEC/FORMAT.md`):
+Run `python3 scripts/sweep.py`. It derives the state of every checklist in
+`.kanon/` per `SPEC/FORMAT.md`:
 
-- `open` — не истекает, не трогать;
-- `closed` старше 7 дней — предложить исход: `drop` / `extract` / `keep`;
-- `stale` (14 дней без движения, есть открытые пункты) — **показать**,
-  не удалять: перечислить открытые пункты и спросить.
+- `open` — never expires, leave alone;
+- `closed` older than 7 days — propose an outcome: `drop` / `extract` / `keep`;
+- `stale` — **surfaced, never dropped**: list the open items and ask.
 
-Правило: истекает тара, а не содержимое. Перед удалением убедись, что
-доказательства переехали туда, где живут долго. Файл, который жалко удалить, —
-признак незакрытой работы, а не повод продлить срок.
+The container expires, the content does not. Before deleting anything, make sure
+the proofs moved somewhere long-lived. A file that feels too valuable to delete
+is a sign of unclosed work, not a reason to extend the deadline.
 
-Молчаливое удаление запрещено во всех трёх случаях.
+Silent deletion is forbidden in all three cases.

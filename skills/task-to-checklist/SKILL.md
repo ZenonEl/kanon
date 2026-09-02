@@ -1,188 +1,203 @@
 ---
 name: task-to-checklist
-description: "Use at the moment work turns from gathering into producing — when research, a brief, a spec or a plan is about to become code, layout, a document or a design. Turns the task into an acceptance checklist in a file while the context is still fresh, so the work survives compaction and a new session. Also use when closing an item with proof, or when asking whether the work is actually finished. Triggers on: иди делай, теперь делай, приступай, начинай верстать, собрали приступаем, по этому плану сделай, сделай несколько вариантов, проверь все экраны, всё ли готово, можно сдавать, что ещё осталось, приёмка, я всё сделал, готово?, чем докажешь."
+description: "Use at the moment work turns from gathering into producing — when research, a brief, a spec or a plan is about to become code, layout, a document or a design. Turns the task into an acceptance checklist in a file while the context is still fresh, so the work survives compaction and a new session. Also use when closing an item with proof, or when asking whether the work is actually finished. Triggers on: now build it, go ahead and build, start implementing, let's produce, we gathered enough, follow the plan and make it, make several variants, check all the screens, is it done, can we ship, what is left, acceptance, I finished, prove it. Триггеры: иди делай, теперь делай, приступай, начинай верстать, собрали приступаем, по этому плану сделай, сделай несколько вариантов, проверь все экраны, всё ли готово, можно сдавать, что ещё осталось, приёмка, я всё сделал, готово, чем докажешь."
 ---
 
 # Task to checklist
 
-Словесная задача → проверяемый список приёмки, записанный в файл **до** начала
-производства.
+A task in words becomes an acceptance checklist in a file — observable results
+and the proof each one requires — written **before** production starts.
 
-Приём тот же, что в `word-to-formula`: устное превращается в проверяемое.
-Там — правило в формулу, здесь — задача в список, недостачу в котором видно.
+## Language
 
-## Зачем
+Work in the language the user speaks. Write the checklist in that language too:
+headings, item text and proofs are theirs.
 
-Сбор материала съедает контекст. Производство начинается после — и идёт уже по
-остаткам. Агент не игнорирует собранное: он его не видит.
+Only the machine tokens are fixed — `check:`, `proof:`, `tried:`, `returned:`,
+`[no check]` and the section names — and each has documented aliases per
+language in [`SPEC/FORMAT.md`](../../SPEC/FORMAT.md). Use the aliases of the
+user's language; the linter parses either. Never force a language on someone to
+satisfy a parser.
 
-Узнаваемый набор симптомов на выходе:
+## Why
 
-- материал собран, но в результате его нет — «делал по памяти»;
-- указание, данное один раз в переписке, не выполнено;
-- проверен один экран из десяти, а не все;
-- сделана одна версия там, где просили несколько;
-- после каждого шага звучит «что дальше?» вместо работы.
+Gathering eats the context window. Production starts afterwards and runs on
+what is left. The agent does not ignore the research — it cannot see it.
 
-Разбор такого обычно объясняет всё это через характер: торопился, прочитал
-невнимательно, решил, что справится сам. Такие объяснения бесполезны — спешку
-нельзя пропатчить.
+Recognisable symptoms:
 
-Настоящая причина одна на все пять: между «понял задачу» и «начал делать» не
-было шага, на котором задача превращается в список, где недостачу видно. Ни один
-из провалов не имел проверки, которая могла бы упасть.
+- the material was collected but is absent from the result — "did it from
+  memory";
+- an instruction given once in chat was not followed;
+- one screen out of ten was checked, not all;
+- one version was produced where several were asked for;
+- every step ends with "what next?" instead of work.
 
-**Файл пишется, пока контекст свежий.** Дальше он и есть источник: контекст
-может уезжать, сессия — начинаться заново, исполнитель — быть другим агентом.
+Post-mortems explain this through character — rushed, read it carelessly,
+thought I could manage. Those explanations cannot be fixed; hurry is not
+patchable.
 
-## Порог: когда НЕ запускаться
+The real cause is the same for all of them: between *understood the task* and
+*started working* there was no step that turns the task into a list where a
+shortfall is visible. None of the failures had a check that could go red.
 
-Скилл, срабатывающий на «поправь опечатку», выключают на второй день.
+**The file is written while the context is fresh.** From then on it is the
+source: the context may be compacted, the session may restart, the work may be
+picked up by someone else.
 
-Запускаться, если выполнено хотя бы одно:
+## Threshold: when to stay silent
 
-- задаче предшествовал **сбор**: читались файлы, шёл поиск, приходил материал;
-- в формулировке есть **число**: «несколько вариантов», «десять экранов», «все
-  роуты»;
-- работа рассчитана больше чем на один шаг и её результат кто-то примет.
+A skill that fires on "fix this typo" gets switched off on the second day.
 
-Ничего из этого нет — молчать. Мелкая правка чеклиста не требует.
+Act when at least one holds:
 
-## Три вопроса
+- the task followed a **gathering** phase — files were read, searches ran,
+  material arrived;
+- the task names a **number** — "several variants", "ten screens", "all routes";
+- the work spans more than one step and someone will accept its result.
 
-Каждый обязан родить строки в файле. Не ответить в уме.
+None of these — say nothing. A small edit needs no checklist.
 
-### 1. Что должно быть на выходе, чтобы задача считалась сделанной?
+## Three questions
 
-Список пунктов. Формулировать как наблюдаемый результат, а не как действие:
-не «сверстать шапку», а «шапка отрисована и открывается на 360px».
+Each must produce lines in the file. Answering in your head does not count.
 
-**Число в задаче становится числом слотов.** «Несколько вариантов» — спросить
-сколько и завести столько пустых строк. «Проверить экраны» — перечислить все
-десять поимённо. Пустой слот виден; «сделаю сколько получится» — нет.
+### 1. What must exist for the task to count as done?
 
-### 2. Чем каждый пункт проверяется?
+A list of items, phrased as observable results rather than actions: not "lay out
+the header" but "the header renders and opens at 360px".
 
-Рядом с пунктом — конкретная проверка: команда, путь к скриншоту, файл,
-хеш коммита, прогон теста.
+**A number in the task becomes a number of slots.** "Several variants" — ask how
+many, record it in `slots:`, create that many lines. "Check the screens" — list
+all ten by name. An empty slot is visible; "as many as I manage" is not.
 
-Пункт без проверки **не запрещён**, но помечается `[без проверки]`. В конце
-видно, сколько таких. Три из пяти без проверки — это не чеклист, а список
-намерений, и лучше узнать об этом до сдачи.
+### 2. What proves each item?
 
-### 3. Что из собранного обязано попасть в результат?
+Next to the item: a command, a screenshot path, a file, a commit hash, a test
+run.
 
-Выжимка из материала — в тот же файл. Требования, ограничения, найденные
-решения, запреты.
+An item with no check is **allowed** but marked `[no check]`. Acceptance then
+shows how many there are. Three out of five unchecked is not a checklist but a
+list of intentions — better to learn that before delivery.
 
-**«Я помню» источником не является.** Материал, оставшийся только в контексте,
-до производства не доживёт.
+### 3. What from the gathered material must reach the result?
 
-## Как закрывается пункт
+A digest into the same file: requirements, constraints, decisions found,
+prohibitions.
 
-Единственное правило, без которого скилл вырождается в формальность:
+**"I remember" is not a source.** Material left only in the context will not
+survive to production.
 
-> **Пункт закрывается вставкой доказательства, а не отметкой.**
+## How an item is closed
 
-Нет вывода команды, пути к скрину, хеша коммита — пункт открыт. «Проверил»,
-«готово», «работает» доказательствами не являются: это утверждения, которым
-нечем возразить.
+The one rule without which this degrades into paperwork:
 
-Проверка на себе: прочитай строку доказательства чужими глазами. `коммит a1b2c3d
-+ скрин out/screens/07.png` — доказательство. `сделано` — его отсутствие.
+> **An item is closed by inserting proof, not by ticking a box.**
 
-## Если пункт провалился
+No command output, no screenshot path, no commit hash — the item is open.
+"Checked", "done", "works" are not proof: they are claims with nothing to argue
+against.
 
-Провал не переделывают молча. Он оставляет строку:
+Read the proof line with a stranger's eyes. `commit a1b2c3d + out/screens/07.png`
+is proof. `done` is its absence.
+
+`scripts/check-checklist.py` refuses the laziest cases mechanically, in any
+supported language. It sees non-emptiness only — judging whether a proof is real
+stays with the reader.
+
+## If an item fails
+
+A failure is not redone quietly. It leaves a line:
 
 ```
-[!] пункт 4 — что пробовал: <действие> · что вернулось: <дословно>
+[!] 4 · tried: <action> · returned: <verbatim> · YYYY-MM-DD
 ```
 
-Иначе третья попытка не знает про первые две, и работа идёт по кругу. Эти же
-две строки — готовый материал, если позже придётся объяснять, почему стоит.
+Otherwise the third attempt knows nothing of the first two and the work circles
+— especially after a session change. Those two fields are also ready material if
+the block later has to be explained to someone.
 
-## Приёмка
+## Acceptance
 
-В конце — прогон файла целиком, а не по памяти:
+At the end, run the file, not your memory:
 
-- сколько пунктов закрыто доказательством;
-- сколько закрыто отметкой без доказательства (это открытые);
-- сколько помечено `[без проверки]`;
-- какие слоты остались пустыми;
-- какие пункты падали и что вернулось.
+- how many items are closed **with proof**;
+- how many are ticked without proof (those are open);
+- how many are marked `[no check]`;
+- which slots are still empty;
+- which items failed and what came back.
 
-Ответ «сделано» звучит только когда первое равно общему числу. Иначе —
-перечислить недостачу.
+Print proofs **verbatim** rather than reporting that they exist: the machine
+sees only non-emptiness, and the difference between a report and "confirmed:
+done" is visible to a person alone.
 
-## Не спрашивать «что дальше»
+"Done" is only said when the first number equals the total. Otherwise list the
+shortfall.
 
-Пока в файле есть незакрытые пункты, вопрос «что дальше» задавать нечего:
-дальше — следующий незакрытый пункт.
+## Do not ask "what next?"
 
-Постоянные «что дальше?» после каждого шага — симптом отсутствующей проверки:
-когда себя проверить нечем, остаётся спрашивать человека. Файл эту роль и
-забирает.
+While the file holds open items there is nothing to ask: next is the next open
+item.
 
-## Срок жизни файла
+A "what next?" after every step is a symptom of a missing check — when there is
+no way to verify yourself, all that remains is to ask a human. The file takes
+that role.
 
-Чеклист — леса, а не здание. **Истекает тара, а не содержимое.**
+## Lifetime
 
-| Состояние | Срок |
+A checklist is scaffolding, not a building. **The container expires, the content
+does not.**
+
+| State | Lifetime |
 |---|---|
-| открытый | не истекает |
-| закрытый | 7 дней, затем удаляется |
-| брошенный (14 дней без движения, есть открытые пункты) | **не удаляется, а показывается** |
+| open | never expires |
+| closed | 7 days, then dropped |
+| stale (14 days idle, items still open) | **surfaced, never dropped** |
 
-Молчаливо удалить незакрытый чеклист — значит стереть ровно ту недостачу, ради
-которой он заводился.
+Dropping an unclosed checklist silently erases the very shortfall it exists to
+show.
 
-Три исхода при истечении:
+Three outcomes on expiry: **drop** (default for closed), **extract** (proofs
+move somewhere long-lived, container deleted), **keep** (rare — the checklist
+became a document).
 
-1. **выбросить** — по умолчанию для закрытых;
-2. **вытащить и выбросить** — доказательства переезжают туда, где живут долго
-   (коммит, требование заказчика, findings-log), тара удаляется;
-3. **сохранить целиком** — редко, когда чеклист сам стал документом.
+**Expiry is also a check.** If the file feels too valuable to delete, the proof
+never moved anywhere, which means the work is not closed. That is a reason to
+ask why, not to extend the deadline.
 
-**Истечение — это ещё и проверка.** Если файл жалко удалять, значит ценное до
-сих пор живёт только в нём — то есть работа не закрыта. Это повод не продлять
-срок, а спросить, почему доказательство никуда не переехало.
+`scripts/sweep.py` computes this. Dates worked out in passing are worked out
+wrong.
 
-## Граница с планированием
+## Boundary with planning
 
-План отвечает на вопрос **«как делать»**. Чеклист — на вопрос **«как пойму, что
-сделано»**. Это разные вопросы, и наличие первого не заменяет второго.
+A plan answers **"how to do it"**. A checklist answers **"how will I know it is
+done"**. Different questions; having the first does not supply the second.
 
-В разобранном случае план был расписан подробно. Мокап всё равно вышел мимо,
-потому что приёмки не было ни в каком виде.
+The common failure looks exactly like this: the plan was detailed, every step
+executed, the result still wrong.
 
-Если план уже написан (`superpowers:writing-plans` или иначе) — не переписывать
-его, а извлечь из него наблюдаемые результаты и проверки.
+If a plan already exists, do not rewrite it — extract the observable results and
+their proofs from it.
 
-## Связь с mnemo (опционально)
+## Optional link to a requirements registry
 
-Скилл самодостаточен и работает в любом каталоге. Экспорт mnemo не требуется.
+Self-contained; no external archive is required.
 
-**Если** он в проекте есть — на каждом пункте дополнительный вопрос: вытекает ли
-он из требования заказчика? Если да, проставить его идентификатор (`t042`).
+If the project has one, each item may carry a requirement identifier, and a
+closed item then yields ready evidence for that requirement. Evidence
+accumulated during the work is more honest than evidence recalled afterwards.
 
-Тогда закрытый пункт даёт готовое `--evidence` для
-`req --id t042 --state done`. Это закрывает известную слабость: сейчас evidence
-пишется в конце и по памяти, а линтер видит только непустоту. Доказательство,
-накопленное по ходу работы, честнее вспомненного.
+## What this does not do
 
-## Чего скилл не делает
+**It does not judge taste.** A default palette or a templated composition is not
+a shortfall in a list. That is a constraint to state in the task.
 
-**Не судит о вкусе.** «Взял первое, что пришло в голову» — не недостача в
-списке. Типовой ИИ-дизайн, дефолтная палитра, модальное решение из обучения
-сюда не ловятся. Это ограничение задачи, а не пункт приёмки.
+**It does not check the quality of the decomposition.** The checklist measures
+completeness against what was written into it, not against what was needed. A
+badly split task yields a green checklist over a bad split.
 
-**Не проверяет качество самого разложения.** Чеклист меряет полноту
-относительно того, что в него выписали, а не относительно того, что было нужно.
-Плохо разложенная задача даёт зелёный чеклист на плохом разложении.
+That limit is structural and is cured only by a second pair of eyes on the
+checklist itself, **before** the work starts.
 
-Это принципиальный предел, и лечится он единственным способом — вторым взглядом
-на сам чеклист **до** начала работы: человеком, вторым агентом, ревьюером.
-
-**Закрытый чеклист означает «ничего не забыто», а не «сделано хорошо».**
-Ревью он не заменяет.
+**It does not replace review.** A closed checklist means *nothing was
+forgotten*, not *this is good*.

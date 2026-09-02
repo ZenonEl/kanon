@@ -1,121 +1,169 @@
-# Формат чеклиста
+# Checklist format
 
-**Версия формата:** 0.1
-**Статус:** нормативный документ. Единственный источник истины о формате файла.
-**Лицензия:** CC BY-SA 4.0 (см. [`LICENSE`](LICENSE))
+**Format version:** 0.2
+**Status:** normative. The single source of truth about the file.
+**License:** CC BY-SA 4.0 (see [`LICENSE`](LICENSE))
 
-Скилл, команды и скрипты этого репозитория — потребители формата. Расхождение
-поведения инструмента с текстом ниже — дефект инструмента.
+Skills, commands and scripts in this repository are consumers of this format. A
+disagreement between a tool's behaviour and the text below is a defect of the
+tool, not a reason to rewrite the spec.
 
-## Расположение
+Russian translation of this document: [`FORMAT.ru.md`](FORMAT.ru.md).
+
+## Language
+
+A checklist is written in **the language its author works in**. The machine
+tokens below are fixed ASCII keys so that the linter parses a checklist
+regardless of that language.
+
+Every token has documented aliases. The linter accepts any of them; new
+translations are added by extending the alias table, never by changing the
+canonical key.
+
+| Canonical | Aliases accepted |
+|---|---|
+| `## Gathered` | `## Собрано`, `## Из собранного` |
+| `## Acceptance` | `## Приёмка` |
+| `## Failures` | `## Провалы` |
+| `check:` | `проверка:` |
+| `proof:` | `подтв:`, `подтверждено:` |
+| `tried:` | `пробовал:` |
+| `returned:` | `вернулось:` |
+| `[no check]` | `[без проверки]` |
+
+Frontmatter keys are always canonical ASCII and are never translated.
+
+## Location
 
 ```
 .kanon/<YYYY-MM-DD>-<slug>.md
 ```
 
-Каталог `.kanon/` — в корне рабочего проекта, добавляется в `.gitignore`.
-Чеклист не коммитится: он леса, а не результат. Всё, что должно пережить
-работу, к моменту истечения обязано жить в другом месте.
+`.kanon/` sits in the working project root and goes into its `.gitignore`. A
+checklist is not committed: it is scaffolding, not a result. Anything that must
+outlive the work has to live elsewhere by the time the file expires.
 
-`slug` — короткое имя задачи в kebab-case, из формулировки задачи.
+`slug` — a short kebab-case name taken from the task.
 
-## Тело файла
+## Body
 
 ```markdown
 ---
-task: <задача одной строкой, как её поставили>
+task: <the task in one line, as it was given>
 opened: YYYY-MM-DD
 closed: YYYY-MM-DD | null
-source: <откуда взят материал: ветка, issue, экспорт mnemo, ссылка>
+slots: <integer | null>
+source: <where the material came from: branch, issue, export, link>
 ---
 
-## Из собранного
+## Gathered
 
-- <требование или ограничение> · <откуда>
-- <запрет> · <откуда>
+- <requirement or constraint> · <where from>
+- <prohibition> · <where from>
 
-## Приёмка
+## Acceptance
 
-- [ ] 1. <наблюдаемый результат> · проверка: <команда | путь | коммит>
-- [x] 2. <наблюдаемый результат> · проверка: <...> · **подтв:** <доказательство>
-- [ ] 3. <наблюдаемый результат> · [без проверки]
-- [ ] 4. <слот> · <пустой, ожидает>
+- [ ] 1. <observable result> · check: <command | path | commit>
+- [x] 2. <observable result> · check: <...> · proof: <the evidence itself>
+- [ ] 3. <observable result> · [no check]
+- [ ] 4. <empty slot, awaiting>
 
-## Провалы
+## Failures
 
-[!] 2 · пробовал: <действие> · вернулось: <дословно> · YYYY-MM-DD
+[!] 2 · tried: <action> · returned: <verbatim> · YYYY-MM-DD
 ```
 
-## Правила
+## Rules
 
-1. **Пункт формулируется как наблюдаемый результат, а не как действие.**
-   «Шапка открывается на 360px» проверяемо; «сверстать шапку» — нет.
+1. **An item states an observable result, not an action.** "The header opens at
+   360px" is checkable; "lay out the header" is not.
 
-2. **Число в задаче становится числом слотов.** Если задача называет количество
-   («три варианта», «десять экранов»), в разделе «Приёмка» обязано быть столько
-   же строк, включая пустые. Пустой слот виден; намерение «сколько получится» —
-   нет.
+2. **A number in the task becomes a number of slots.** If the task names a
+   quantity ("three variants", "ten screens"), `slots:` records it and the
+   Acceptance section must hold that many lines, empty ones included. An empty
+   slot is visible; an intention to do "as many as I manage" is not.
 
-3. **Пункт закрывается доказательством, а не отметкой.** `[x]` без поля
-   `подтв:` недействителен и читается как открытый. Доказательство — вывод
-   команды, путь к файлу или скриншоту, хеш коммита, ссылка на прогон.
-   «Сделано», «проверил», «работает» доказательствами не являются.
+   `slots: null` means the task named no quantity. Omitting the field when the
+   task did name one is a defect: the rule becomes unverifiable.
 
-4. **Пункт без проверки разрешён, но помечен** `[без проверки]`. Запрещать
-   нельзя: часть работы проверяется только глазами. Скрывать — тоже: в приёмке
-   должно быть видно, какая доля результата ничем не подтверждается.
+3. **An item is closed by proof, not by a tick.** `[x]` without a `proof:` field
+   is invalid and reads as open. Proof is command output, a path to a file or
+   screenshot, a commit hash, a link to a run. "Done", "checked", "works" are
+   not proof.
 
-5. **Провал оставляет след.** Переделка без записи в раздел «Провалы»
-   недопустима: следующая попытка обязана знать про предыдущие.
+4. **An item with no check is allowed, but marked** `[no check]`. Forbidding it
+   is wrong: part of any work is honestly verified only by eye. Hiding it is
+   wrong too — acceptance must show what share of the result rests on nothing.
 
-6. **«Я помню» источником не является.** Раздел «Из собранного» заполняется до
-   начала производства, пока материал ещё в контексте. Пустой раздел при
-   наличии предшествовавшего сбора — дефект.
+5. **A failure leaves a trace.** Redoing an item without an entry in Failures is
+   not allowed: the next attempt must know about the previous ones. A failure
+   entry references an existing item number.
 
-## Состояния
+6. **"I remember" is not a source.** Gathered is filled in before production
+   starts, while the material is still in context. An empty Gathered section
+   after a gathering phase is a defect.
 
-Состояние **выводится**, а не хранится:
+## States
 
-| Состояние | Условие |
+State is **derived**, never stored:
+
+| State | Condition |
 |---|---|
-| `closed` | непустой `closed` во фронтматтере |
-| `stale` | `closed` пуст И последнее изменение файла старше 14 дней |
-| `open` | иначе |
+| `closed` | `closed` is non-empty |
+| `stale` | `closed` is empty AND the file has not changed for 14 days |
+| `open` | otherwise |
 
-Хранимый статус — утверждение, которому нечем возразить. Выведенный из даты и
-содержимого проверяется.
+A stored status is a claim with nothing to argue against. One derived from a
+date and the file's content can be checked.
 
-## Срок жизни
+## Lifetime
 
-| Состояние | Срок |
+| State | Lifetime |
 |---|---|
-| `open` | не истекает |
-| `closed` | 7 дней от даты `closed`, затем удаляется |
-| `stale` | **не удаляется; показывается** с перечнем открытых пунктов |
+| `open` | never expires |
+| `closed` | 7 days from the `closed` date, then dropped |
+| `stale` | **never dropped; surfaced** with its open items listed |
 
-Принцип: **истекает тара, а не содержимое.** Ценное к моменту истечения обязано
-жить не здесь — в коммите, в требовании заказчика, в findings-log.
+The principle: **the container expires, the content does not.** By expiry
+everything valuable must live somewhere else — in a commit, in a requirement, in
+a findings log.
 
-Истечение работает и как проверка: файл, который жалко удалить, означает, что
-доказательство никуда не переехало, то есть работа не закрыта.
+Expiry doubles as a check: a file you are reluctant to delete means the proof
+never moved anywhere, which means the work is not closed.
 
-Три исхода:
+Three outcomes:
 
-1. `drop` — выбросить (по умолчанию для `closed`);
-2. `extract` — вытащить доказательства в долгоживущее место, тару удалить;
-3. `keep` — сохранить целиком (редко; чеклист сам стал документом).
+1. `drop` — delete (the default for `closed`);
+2. `extract` — move the proof somewhere long-lived, delete the container;
+3. `keep` — preserve whole (rare; the checklist became a document).
 
-## Привязка к mnemo (необязательная)
+## Optional link to a requirements registry
 
-Если в проекте есть экспорт mnemo, пункт приёмки может нести идентификатор
-требования:
+An acceptance item may carry the identifier of an external requirement:
 
 ```markdown
-- [x] 2. <результат> · req: t042 · проверка: <...> · **подтв:** <доказательство>
+- [x] 2. <result> · req: t042 · check: <...> · proof: <evidence>
 ```
 
-Тогда поле `подтв:` — готовое значение для
-`mnemo_manifest.py req --id t042 --state done --evidence "<...>"`.
+The `proof:` field is then a ready value for that registry's evidence field.
 
-Привязка односторонняя: kanon знает про mnemo, mnemo про kanon не знает и знать
-не обязан. Отсутствие экспорта не мешает работе.
+The link is one-way: kanon knows about the registry, the registry does not know
+about kanon and does not need to. Its absence does not affect anything.
+
+## What the linter checks
+
+`scripts/check-checklist.py` verifies form only:
+
+- frontmatter present and parseable, `opened` a valid date;
+- `slots:` present when the task names a quantity, and matching the number of
+  acceptance lines;
+- no `[x]` without `proof:`;
+- `proof:` not in the stop list of empty affirmations, in any supported
+  language;
+- failure entries reference existing item numbers;
+- Gathered is not empty.
+
+It cannot check whether a proof is real or an item well chosen. A machine sees
+non-emptiness; only a person tells a report from the words "confirmed: done".
+That is why acceptance prints proofs verbatim instead of reporting that they
+exist.
