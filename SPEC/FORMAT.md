@@ -1,6 +1,6 @@
 # Checklist format
 
-**Format version:** 0.3
+**Format version:** 0.4
 **Status:** normative. The single source of truth about the file.
 **License:** CC BY-SA 4.0 (see [`LICENSE`](LICENSE))
 
@@ -12,9 +12,23 @@ Russian translation of this document: [`FORMAT.ru.md`](FORMAT.ru.md).
 
 ## Language
 
-A checklist is written in **the language its author works in**. The machine
-tokens below are fixed ASCII keys so that the linter parses a checklist
-regardless of that language.
+A checklist is written in **the language its author works in** — not in the
+language of this document. If that language cannot be determined, English is the
+default: it is the better working language for a model, and a wrong guess is
+cheap to correct.
+
+**Quoted material is never translated.** What came from somewhere else stays in
+the words it came in: `returned:` is verbatim, a Gathered entry quoting a brief
+or a requirement keeps the source's language, a proof that is a command's output
+is that output. Translating evidence destroys what made it evidence — it stops
+being checkable against the thing it came from.
+
+A single checklist may therefore mix languages: its own prose in the author's
+language, its quotes in the sources' languages. That is correct, not sloppy, and
+the linter parses it.
+
+The machine tokens below are fixed ASCII keys so that a checklist parses
+regardless of any of this.
 
 Every token has documented aliases. The linter accepts any of them; new
 translations are added by extending the alias table, never by changing the

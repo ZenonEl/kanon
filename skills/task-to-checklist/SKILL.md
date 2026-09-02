@@ -10,14 +10,29 @@ and the proof each one requires — written **before** production starts.
 
 ## Language
 
-Work in the language the user speaks. Write the checklist in that language too:
-headings, item text and proofs are theirs.
+This skill is written in English. **The checklist is not.**
 
-Only the machine tokens are fixed — `check:`, `proof:`, `tried:`, `returned:`,
+Write it in the language the user speaks — headings, item text, your own
+wording. Do not produce an English file for a Russian-speaking user, or the
+reverse, unless they ask for it. The language of these instructions says nothing
+about the language of the output.
+
+If the user's language cannot be determined, default to English: it is the
+better working language for a model, and a wrong guess costs one correction.
+
+**Never translate what you are quoting.** `returned:` is verbatim — the error
+text as it appeared. A Gathered entry quoting a brief or a requirement keeps the
+source's words. A proof that is command output stays that output. Translating
+evidence destroys what made it evidence: it can no longer be checked against
+where it came from.
+
+So one checklist may mix languages — your prose in the user's language, quotes
+in their sources' languages. That is correct, and the linter parses it.
+
+Machine tokens are fixed — `check:`, `proof:`, `tried:`, `returned:`,
 `[no check]` and the section names — and each has documented aliases per
 language in [`SPEC/FORMAT.md`](../../SPEC/FORMAT.md). Use the aliases of the
-user's language; the linter parses either. Never force a language on someone to
-satisfy a parser.
+user's language. Never force a language on someone to satisfy a parser.
 
 ## Why
 

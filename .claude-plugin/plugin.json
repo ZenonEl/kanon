@@ -1,7 +1,7 @@
 {
   "name": "kanon",
   "description": "Acceptance checklists for coding agents: turn a task into a file of observable results and their proofs before production starts, so the work survives context compaction and a new session",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "author": {
     "name": "ZenonEl"
   },
