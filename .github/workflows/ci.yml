@@ -21,10 +21,14 @@ jobs:
       - name: Скилы и команды пригодны к маршрутизации
         run: python3 scripts/check-skills.py
 
+      - name: Самопроверка линтера, sweep и хуков
+        run: bash tests/selftest.sh
+
       - name: Манифесты — валидный JSON
         run: |
           for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json \
-                   .agents/plugins/marketplace.json .codex-plugin/plugin.json; do
+                   .agents/plugins/marketplace.json .codex-plugin/plugin.json \
+                   hooks/hooks.json; do
             python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
             echo "ok  $f"
           done
