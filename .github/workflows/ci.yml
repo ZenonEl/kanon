@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Версии согласованы во всех манифестах и описаны в CHANGELOG
+        run: python3 scripts/check-versions.py
+
+      - name: Скилы и команды пригодны к маршрутизации
+        run: python3 scripts/check-skills.py
+
+      - name: Манифесты — валидный JSON
+        run: |
+          for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json \
+                   .agents/plugins/marketplace.json .codex-plugin/plugin.json; do
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
+            echo "ok  $f"
+          done
+
+      - name: Зеркала маркетплейса совпадают
+        run: |
+          diff .claude-plugin/marketplace.json .agents/plugins/marketplace.json \
+            && echo "ok  зеркала совпадают"
+
+      - name: В коммиты не уехали рабочие чеклисты
+        run: |
+          if git ls-files | grep -q '^\.kanon/'; then
+            echo "ОШИБКА: .kanon/ под версионным контролем — это рабочие файлы"
+            exit 1
+          fi
+          echo "ok  .kanon/ не отслеживается"
