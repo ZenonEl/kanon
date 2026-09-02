@@ -102,7 +102,8 @@ def on_session_start(_: dict) -> str:
 def on_pre_tool_use(payload: dict) -> str:
     target = str(payload.get("tool_input", {}).get("file_path", ""))
     # Запись самого чеклиста — не производство.
-    if f"{os.sep}.kanon{os.sep}" in target or target.startswith(".kanon"):
+    if any(f"{os.sep}{d}{os.sep}" in target or target.startswith(d)
+               for d in ("_kanon", ".kanon")):
         return ""
 
     docs = [d for d in _checklists() if d.state == "open"]

@@ -11,9 +11,14 @@
 The container expires, the content does not. Nothing is deleted automatically:
 this only reports and proposes an outcome.
 
+Заодно пересобирает INDEX.md — производный файл, как у соседних инструментов:
+одна читаемая поверхность на все чеклисты. Руками не правится, при каждом
+прогоне переписывается.
+
 Usage:
-    sweep.py            # отчёт / report
-    sweep.py --quiet    # только то, что требует внимания (для хуков)
+    sweep.py            # отчёт + пересборка INDEX.md
+    sweep.py --quiet    # только требующее внимания (для хуков), INDEX тоже
+    sweep.py --no-index # без пересборки
 """
 from __future__ import annotations
 
@@ -21,7 +26,37 @@ import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from kanon_format import find, parse  # noqa: E402
+from kanon_format import INDEX_NAME, directory, find, parse  # noqa: E402
+
+
+STATE_LABEL = {
+    "open": "в работе / open",
+    "closed": "закрыт / closed",
+    "stale": "заброшен / stale",
+}
+
+
+def write_index(docs: list) -> pathlib.Path | None:
+    """Пересобрать INDEX.md. Производный файл: правки в нём затираются."""
+    folder = directory()
+    if folder is None:
+        return None
+    lines = ["# kanon · checklists", "",
+             "Производный файл — пересобирается `sweep.py`. Руками не править.",
+             "Derived file, rebuilt by `sweep.py`. Do not edit by hand.", "",
+             "| Чеклист / checklist | Состояние / state | Закрыто доказательством / closed with proof | Задача / task |",
+             "|---|---|---|---|"]
+    for doc in sorted(docs, key=lambda d: (d.state != "stale", d.path.name)):
+        closed = len([i for i in doc.items if i.closed])
+        task = (doc.meta.get("task", "") or "").replace("|", "\\|")
+        lines.append(f"| [{doc.path.name}]({doc.path.name}) "
+                     f"| {STATE_LABEL.get(doc.state, doc.state)} "
+                     f"| {closed}/{len(doc.items)} | {task} |")
+    if not docs:
+        lines.append("| — | — | — | пока пусто / empty |")
+    target = folder / INDEX_NAME
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return target
 
 
 def main(argv: list[str]) -> int:
@@ -32,10 +67,13 @@ def main(argv: list[str]) -> int:
             print("чеклистов нет / no checklists")
         return 0
 
+    docs = [parse(p) for p in paths]
     buckets: dict[str, list] = {"open": [], "closed": [], "stale": []}
-    for path in paths:
-        doc = parse(path)
+    for doc in docs:
         buckets[doc.state].append(doc)
+
+    if "--no-index" not in argv:
+        write_index(docs)
 
     lines: list[str] = []
 

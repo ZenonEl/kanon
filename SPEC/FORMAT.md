@@ -1,6 +1,6 @@
 # Checklist format
 
-**Format version:** 0.2
+**Format version:** 0.3
 **Status:** normative. The single source of truth about the file.
 **License:** CC BY-SA 4.0 (see [`LICENSE`](LICENSE))
 
@@ -36,12 +36,23 @@ Frontmatter keys are always canonical ASCII and are never translated.
 ## Location
 
 ```
-.kanon/<YYYY-MM-DD>-<slug>.md
+_kanon/
+├── INDEX.md                  derived — rebuilt by sweep.py, never hand-written
+└── <YYYY-MM-DD>-<slug>.md    one checklist per task
 ```
 
-`.kanon/` sits in the working project root and goes into its `.gitignore`. A
+`_kanon/` sits in the working project root and goes into its `.gitignore`. A
 checklist is not committed: it is scaffolding, not a result. Anything that must
 outlive the work has to live elsewhere by the time the file expires.
+
+The directory is **visible, not hidden**: a tool that hides its own files hides
+the shortfall it exists to show. The leading underscore sorts it to the top.
+
+**The name is a recommendation, not a rule.** `.kanon/` from earlier versions is
+still accepted, and `KANON_DIR` overrides both. A check whose warnings people
+learn to skip is worse than no check.
+
+`INDEX.md` is derived. Edits to it are overwritten on the next `sweep.py`.
 
 `slug` — a short kebab-case name taken from the task.
 

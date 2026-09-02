@@ -5,7 +5,7 @@ argument-hint: The task in one line
 
 Use the **kanon:task-to-checklist** skill.
 
-Create `.kanon/<YYYY-MM-DD>-<slug>.md` following `SPEC/FORMAT.md`. Write it in
+Create `_kanon/<YYYY-MM-DD>-<slug>.md` following `SPEC/FORMAT.md`. Write it in
 the user's language, using that language's aliases for the machine tokens.
 
 Three questions, each producing lines in the file:

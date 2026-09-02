@@ -71,7 +71,7 @@ block anything** — they only speak.
 | `Stop` | open items remain; lists them |
 
 The pre-write reminder deliberately stays silent when: an open checklist already
-exists, the write targets `.kanon/` itself, fewer than three gathering
+exists, the write targets `_kanon/` itself, fewer than three gathering
 operations happened in the session, or it already spoke once.
 
 A hook that fails exits 0 and says nothing. A broken hook is worse than no hook.
@@ -101,12 +101,12 @@ Whether a live phrase raises the skill it cannot know. That is measured by a run
 
 ## Working files
 
-Checklists are written to `.kanon/` in the working project root and are **not
+Checklists are written to `_kanon/` in the working project root and are **not
 committed**: scaffolding, not results. Add to the project's `.gitignore`:
 
 ```
-.kanon/
+_kanon/
 ```
 
-Done already in this repository, and CI checks separately that `.kanon/` never
+Done already in this repository, and CI checks separately that `_kanon/` never
 entered version control.

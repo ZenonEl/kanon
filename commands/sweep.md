@@ -5,7 +5,7 @@ description: Lifetime — what expired, what to extract, what to surface
 Use the **kanon:task-to-checklist** skill.
 
 Run `python3 scripts/sweep.py`. It derives the state of every checklist in
-`.kanon/` per `SPEC/FORMAT.md`:
+`_kanon/` per `SPEC/FORMAT.md`:
 
 - `open` — never expires, leave alone;
 - `closed` older than 7 days — propose an outcome: `drop` / `extract` / `keep`;

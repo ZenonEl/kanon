@@ -35,4 +35,27 @@ done
 echo 'мусор' | python3 hooks/kanon-hook.py PreToolUse >/dev/null 2>&1 \
   && echo "ok    хук не падает на мусоре" || { echo "ОШИБКА хук упал на мусоре"; fail=1; }
 
+# Каталог: новое имя, историческое, переопределение, INDEX не чеклист.
+tmp=$(mktemp -d)
+mkdir -p "$tmp/_kanon" "$tmp/legacy/.kanon" "$tmp/env/custom"
+cp tests/fixtures/good-ru.md "$tmp/_kanon/x.md"
+cp tests/fixtures/good-ru.md "$tmp/legacy/.kanon/x.md"
+cp tests/fixtures/good-ru.md "$tmp/env/custom/x.md"
+here=$(pwd)
+( cd "$tmp" && python3 "$here/scripts/check-checklist.py" >/dev/null 2>&1 ) \
+  && echo "ok    каталог _kanon найден" || { echo "ОШИБКА _kanon не найден"; fail=1; }
+( cd "$tmp/legacy" && python3 "$here/scripts/check-checklist.py" >/dev/null 2>&1 ) \
+  && echo "ok    историческое .kanon принимается" || { echo "ОШИБКА .kanon не принят"; fail=1; }
+( cd "$tmp/env" && KANON_DIR=custom python3 "$here/scripts/check-checklist.py" >/dev/null 2>&1 ) \
+  && echo "ok    KANON_DIR переопределяет" || { echo "ОШИБКА KANON_DIR"; fail=1; }
+( cd "$tmp" && python3 "$here/scripts/sweep.py" >/dev/null 2>&1 )
+[ -f "$tmp/_kanon/INDEX.md" ] && echo "ok    INDEX.md собран" \
+  || { echo "ОШИБКА INDEX.md не собран"; fail=1; }
+if ( cd "$tmp" && python3 "$here/scripts/check-checklist.py" 2>&1 | grep -q INDEX ); then
+  echo "ОШИБКА INDEX.md попал в чеклисты"; fail=1
+else
+  echo "ok    INDEX.md чеклистом не считается"
+fi
+command rm -rf "$tmp"
+
 exit $fail

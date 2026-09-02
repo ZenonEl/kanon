@@ -14,11 +14,20 @@ extending the alias table; canonical keys never change.
 from __future__ import annotations
 
 import datetime as _dt
+import os
 import pathlib
 import re
 from dataclasses import dataclass, field
 
-CHECKLIST_DIR = ".kanon"
+# Каталог виден, а не спрятан: инструмент, который прячет свои файлы, прячет и
+# недостачу, ради показа которой заведён. Подчёркивание — как у соседних
+# инструментов, сортируется наверх.
+#
+# The directory is visible, not hidden: a tool that hides its own files hides
+# the shortfall it exists to show.
+CHECKLIST_DIR = "_kanon"
+LEGACY_DIRS = (".kanon",)
+INDEX_NAME = "INDEX.md"
 
 # --- псевдонимы / aliases -------------------------------------------------
 
@@ -206,9 +215,28 @@ def parse(path: pathlib.Path) -> Checklist:
     return doc
 
 
-def find(root: pathlib.Path | None = None) -> list[pathlib.Path]:
+def directory(root: pathlib.Path | None = None) -> pathlib.Path | None:
+    """Каталог чеклистов. Опознаётся по имени, но имя — рекомендация.
+
+    KANON_DIR переопределяет. Исторические имена принимаются: проверка, чьи
+    предупреждения учатся пропускать, хуже отсутствующей.
+    """
     root = root or pathlib.Path.cwd()
-    directory = root / CHECKLIST_DIR
-    if not directory.is_dir():
+    override = os.environ.get("KANON_DIR")
+    if override:
+        candidate = pathlib.Path(override)
+        candidate = candidate if candidate.is_absolute() else root / candidate
+        return candidate if candidate.is_dir() else None
+    for name in (CHECKLIST_DIR, *LEGACY_DIRS):
+        candidate = root / name
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
+def find(root: pathlib.Path | None = None) -> list[pathlib.Path]:
+    folder = directory(root)
+    if folder is None:
         return []
-    return sorted(p for p in directory.glob("*.md") if p.is_file())
+    return sorted(p for p in folder.glob("*.md")
+                  if p.is_file() and p.name != INDEX_NAME)
