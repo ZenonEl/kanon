@@ -34,6 +34,7 @@ raises, and the pre-write reminder speaks once per session.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import pathlib
@@ -76,7 +77,7 @@ def _checklists() -> list:
         try:
             docs.append(parse(path))
         except Exception:  # noqa: BLE001
-            continue
+            continue  # включая ValueError от гигантских чисел
     return docs
 
 
@@ -117,7 +118,10 @@ def _once_per_session(session_id: str) -> bool:
     """
     if not session_id:
         return True
-    safe = "".join(c for c in session_id if c.isalnum() or c in "-_")[:64] or "unknown"
+    # Хеш, а не вычистка символов: канонизация склеивала разные идентификаторы
+    # в одно имя («review-a/b» и «review-ab»), и вторая сессия молча теряла своё
+    # единственное напоминание.
+    safe = hashlib.sha256(session_id.encode("utf-8", "replace")).hexdigest()[:32]
     folder = pathlib.Path(tempfile.gettempdir()) / f"kanon-{os.getuid()}"
     try:
         folder.mkdir(mode=0o700, exist_ok=True)

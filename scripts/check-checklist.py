@@ -67,7 +67,7 @@ def check(doc: Checklist) -> list[tuple[str, str]]:
             warn.append(f"в задаче есть «{found.group(0)}», а slots=null — "
                         f"если это про число результатов, поставь его / "
                         f"task names a quantity but slots is null")
-    elif not (slots.isascii() and slots.isdigit()):
+    elif not (slots.isascii() and slots.isdigit() and len(slots) <= 6):
         errors.append(f"slots={slots!r} — не целое число / not an integer")
     elif int(slots) != len(doc.items):
         errors.append(
@@ -99,6 +99,12 @@ def check(doc: Checklist) -> list[tuple[str, str]]:
         if number not in numbers:
             errors.append(f"провал ссылается на несуществующий пункт {number} / dangling failure")
         missing = [k for k in ("tried", "returned") if not fields.get(k)]
+        # Одна проверка, а не две: valid_date("") уже ложь, и отдельная ветка
+        # «поля нет» была её дубликатом — снятие любой из них ничего не меняло.
+        stamp = fields.get("date", "")
+        if not valid_date(stamp):
+            errors.append(f"провал по пункту {number}: дата {stamp!r} отсутствует или "
+                          f"не существует / missing or impossible date")
         if missing:
             errors.append(f"провал по пункту {number} без полей {', '.join(missing)} — "
                           f"след без попытки следом не является / failure without an attempt")
@@ -172,7 +178,7 @@ def main(argv: list[str]) -> int:
             continue
         try:
             doc = parse(path)
-        except (OSError, UnicodeDecodeError) as exc:
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
             # Отдельный файл, а не весь каталог: один нечитаемый чеклист не
             # должен ослеплять проверку на остальных.
             print(f"  {path}: не прочитан ({exc.__class__.__name__}) / unreadable")

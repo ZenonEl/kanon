@@ -24,11 +24,16 @@ from __future__ import annotations
 
 import os
 import pathlib
+import stat
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from kanon_format import INDEX_NAME, directory, find, parse  # noqa: E402
 
+
+# Первая строка производного индекса. По ней он и опознаётся: имя каталога
+# авторизацией не является. Менять её нельзя, не сломав опознание чужих файлов.
+INDEX_HEADER = "# kanon · checklists"
 
 STATE_LABEL = {
     "open": "в работе / open",
@@ -37,12 +42,32 @@ STATE_LABEL = {
 }
 
 
+def owns_index(target: pathlib.Path) -> bool:
+    """Наш ли это INDEX.md.
+
+    Каталог с подходящим именем — не разрешение переписывать в нём файлы.
+    Индекс пишется автоматически из хука в любом каталоге, куда зашла сессия, и
+    чужой `_kanon/INDEX.md` терял содержимое без команды и без предупреждения.
+    Опознаём по собственному заголовку; отсутствующий файл писать можно.
+    """
+    try:
+        if not target.exists():
+            return True
+        with target.open(encoding="utf-8", errors="replace") as fh:
+            return fh.readline().strip() == INDEX_HEADER
+    except OSError:
+        return False
+
+
 def write_index(docs: list) -> pathlib.Path | None:
     """Пересобрать INDEX.md. Производный файл: правки в нём затираются."""
     folder = directory()
     if folder is None:
         return None
-    lines = ["# kanon · checklists", "",
+    target = folder / INDEX_NAME
+    if not owns_index(target):
+        raise PermissionError(f"{INDEX_NAME} создан не нами — не трогаем")
+    lines = [INDEX_HEADER, "",
              "Производный файл — пересобирается `sweep.py`. Руками не править.",
              "Derived file, rebuilt by `sweep.py`. Do not edit by hand.", "",
              "| Чеклист / checklist | Состояние / state | Закрыто доказательством / closed with proof | Задача / task |",
@@ -55,7 +80,6 @@ def write_index(docs: list) -> pathlib.Path | None:
                      f"| {closed}/{len(doc.items)} | {task} |")
     if not docs:
         lines.append("| — | — | — | пока пусто / empty |")
-    target = folder / INDEX_NAME
     payload = "\n".join(lines) + "\n"
 
     # Пишем во временный файл и подменяем именем, а не пишем в существующий.
@@ -68,11 +92,19 @@ def write_index(docs: list) -> pathlib.Path | None:
     #
     # INDEX.md пишется автоматически из хука при старте сессии, то есть в любом
     # каталоге, куда зашла сессия, — цена ошибки здесь чужой файл.
+    # Режим берём у существующего индекса: подмена ставит новый inode, и
+    # приватный 0600 молча становился бы 0644 — а в индексе имена задач.
+    try:
+        mode = stat.S_IMODE(target.stat().st_mode)
+    except OSError:
+        mode = 0o644
+
     tmp = folder / f".{INDEX_NAME}.tmp-{os.getpid()}"
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(payload)
+        os.chmod(tmp, mode)  # umask не должен сужать унаследованный режим
         os.replace(tmp, target)
     except BaseException:
         try:
@@ -92,15 +124,19 @@ def main(argv: list[str]) -> int:
     for path in paths:
         try:
             docs.append(parse(path))
-        except (OSError, UnicodeDecodeError) as exc:
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
             # Пофайлово: один битый чеклист не должен уносить отчёт по всем.
+            # ValueError тоже: гигантское число в номере пункта роняло разбор
+            # раньше, чем сосед успевал попасть в отчёт.
             unreadable.append(f"{path.name} ({exc.__class__.__name__})")
 
     if not docs and not skipped and not unreadable:
         if "--no-index" not in argv:
             try:
-                write_index([])  # каталог опустел — индекс обязан это отразить
-            except OSError:
+                # Каталог опустел — индекс обязан это отразить. Но только если
+                # индекс наш: чужой файл с тем же именем не трогаем.
+                write_index([])
+            except (OSError, PermissionError):
                 pass
         if not quiet:
             print("чеклистов нет / no checklists")
@@ -119,7 +155,9 @@ def main(argv: list[str]) -> int:
             # Отчёт важнее производного файла: раньше падение записи уносило с
             # собой весь вывод про заброшенное и истёкшее, ради которого команду
             # и вызывают.
-            index_failed = f"  INDEX.md не записан ({exc.strerror}) / index not written"
+            index_failed = (f"  INDEX.md не записан "
+                            f"({exc.strerror or exc.args[0] if exc.args else exc}) "
+                            f"/ index not written")
 
     # stale — показать, не удалять. Самый важный раздел.
     for doc in buckets["stale"]:

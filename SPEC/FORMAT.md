@@ -1,6 +1,6 @@
 # Checklist format
 
-**Format version:** 0.5
+**Format version:** 0.6
 **Status:** normative. The single source of truth about the file.
 **License:** CC BY-SA 4.0 (see [`LICENSE`](LICENSE))
 
@@ -70,6 +70,15 @@ still accepted, and `KANON_DIR` overrides both. A check whose warnings people
 learn to skip is worse than no check.
 
 `INDEX.md` is derived. Edits to it are overwritten on the next `sweep.py`.
+
+It is rewritten **only if it is ours**, recognised by its first line. A directory
+name is not permission to replace files inside it: the index is written
+automatically from a hook in whatever directory a session opened. The write goes
+to a temporary file and is renamed into place, so neither a symbolic nor a hard
+link diverts it, and an existing index keeps its file mode.
+
+A checklist that is a symbolic link, or that has more than one name, is not read
+and is reported as skipped — for the same reason.
 
 `slug` — a short kebab-case name taken from the task.
 
@@ -199,7 +208,8 @@ about kanon and does not need to. Its absence does not affect anything.
   `tried:` and `returned:` — a trace with no attempt in it is not a trace;
 - item numbers are unique: failures and acceptance output reference them;
 - an item carries either `check:` or the `[no check]` marker;
-- dates are real dates, not merely `YYYY-MM-DD`-shaped;
+- dates are real dates, not merely `YYYY-MM-DD`-shaped — including the date
+  on every failure record, which is required;
 - Gathered is not empty.
 
 It cannot check whether a proof is real or an item well chosen. A machine sees

@@ -43,6 +43,7 @@ FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     "tried": ("tried", "пробовал"),
     "returned": ("returned", "вернулось"),
     "req": ("req",),
+    "date": ("date", "дата"),
 }
 
 NO_CHECK = ("[no check]", "[без проверки]")
@@ -60,8 +61,11 @@ EMPTY_PROOF = {
 
 _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 _HEADING = re.compile(r"^##\s+(.+?)\s*$")
-_ITEM = re.compile(r"^-\s*\[([ xX])\]\s*(\d+)\.\s*(.*)$")
-_FAILURE = re.compile(r"^\[!\]\s*(\d+)\s*·?\s*(.*)$")
+# Длина числа ограничена намеренно: `int()` на строке из тысяч цифр бросает
+# ValueError и уносил разбор всего каталога раньше, чем сосед попадал в отчёт.
+# Не подошедшая под шаблон строка не исчезает — она попадает в malformed.
+_ITEM = re.compile(r"^-\s*\[([ xX])\]\s*(\d{1,6})\.\s*(.*)$")
+_FAILURE = re.compile(r"^\[!\]\s*(\d{1,6})\s*·?\s*(.*)$")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -229,8 +233,33 @@ def _split_fields(tail: str) -> tuple[str, dict[str, str], bool]:
     return text, fields, no_check
 
 
+def open_checklist(path: pathlib.Path) -> str:
+    """Прочитать чеклист, привязав решение о ссылке к открытому файлу.
+
+    Проверка `is_symlink()` при обходе каталога и последующее открытие по имени
+    — разные операции: между ними файл можно подменить символической ссылкой, и
+    чтение уйдёт наружу. `O_NOFOLLOW` решает это в момент открытия.
+
+    Жёсткая ссылка символической не является и по имени неотличима, поэтому
+    отдельно отказываемся от файла с несколькими именами: чеклист — рабочий
+    файл, второе имя у него берётся не просто так.
+    """
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        if os.fstat(fd).st_nlink > 1:
+            raise OSError(f"{path.name}: несколько имён у файла, не читаем")
+        with os.fdopen(fd, "r", encoding="utf-8") as fh:
+            return fh.read()
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        raise
+
+
 def parse(path: pathlib.Path) -> Checklist:
-    text = path.read_text(encoding="utf-8")
+    text = open_checklist(path)
     doc = Checklist(path=path)
 
     m = _FRONTMATTER.match(text)
@@ -284,7 +313,16 @@ def parse(path: pathlib.Path) -> Checklist:
             stripped = raw.strip()
             fail = _FAILURE.match(stripped)
             if fail:
-                _, fields, _nc = _split_fields("x · " + fail.group(2))
+                # Дату снимаем с хвоста ДО разбора полей: она стоит последним
+                # сегментом без ключа, и склейка приписала бы её к последнему
+                # полю — какому именно, зависит от порядка, так что проверить
+                # её было бы нечем.
+                tail, stamp = fail.group(2), ""
+                head, sep, last = tail.rpartition("·")
+                if sep and _DATE.match(last.strip()):
+                    tail, stamp = head.strip(), last.strip()
+                _, fields, _nc = _split_fields("x · " + tail)
+                fields["date"] = stamp
                 doc.failures.append((int(fail.group(1)), fields))
             elif stripped.startswith("[!]"):
                 # Строка выглядит записью провала и не разобралась: пропустить

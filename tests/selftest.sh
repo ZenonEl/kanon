@@ -97,7 +97,7 @@ else
   echo "ОШИБКА PreToolUse печатает не JSON — вывод не доедет до адресата"; fail=1
 fi
 [ -z "$second" ] && echo "ok    PreToolUse говорит один раз за сессию"   || { echo "ОШИБКА PreToolUse повторился в той же сессии"; fail=1; }
-command rm -rf "$hb" "$pb" "/tmp/kanon-reminded-$sid"
+command rm -rf "$hb" "$pb" "${TMPDIR:-/tmp}/kanon-$(id -u)"
 
 # Пункт, который не разобрался, обязан быть ошибкой, а не тишиной.
 mb=$(mktemp -d)
@@ -309,7 +309,7 @@ pay2="{\"session_id\":\"$sid2\",\"transcript_path\":\"$tr2\",\"tool_input\":{\"f
 nag=$( cd "$nb" && echo "$pay2" | python3 "$here_root/hooks/kanon-hook.py" PreToolUse )
 [ -z "$nag" ] && echo "ok    PreToolUse молчит при живом заброшенном чеклисте" \
   || { echo "ОШИБКА PreToolUse требует чеклист, хотя он есть"; fail=1; }
-command rm -rf "$nb" "/tmp/kanon-reminded-$sid2"
+command rm -rf "$nb" "${TMPDIR:-/tmp}/kanon-$(id -u)"
 
 # Обязательные поля frontmatter и пустой Gathered: каждая проверка линтера
 # должна иметь свой ассерт, иначе её снятие проходит молча.
@@ -375,11 +375,43 @@ ln -s "$cb/secret.md" "$cb/_kanon/link.md"
   || { echo "ОШИБКА симлинк пропущен молча"; fail=1; }
 
 # Опустевший каталог обязан обновить индекс, а не оставить старый.
-eb=$(mktemp -d); mkdir -p "$eb/_kanon"; echo "старое" > "$eb/_kanon/INDEX.md"
+eb=$(mktemp -d); mkdir -p "$eb/_kanon"
+printf '# kanon · checklists\n\nстарое\n' > "$eb/_kanon/INDEX.md"
 ( cd "$eb" && python3 "$here_root/scripts/sweep.py" >/dev/null 2>&1 )
 grep -q 'старое' "$eb/_kanon/INDEX.md" \
-  && { echo "ОШИБКА индекс не обновлён на пустом каталоге"; fail=1; } \
-  || echo "ok    пустой каталог обновляет индекс"
+  && { echo "ОШИБКА наш индекс не обновлён на пустом каталоге"; fail=1; } \
+  || echo "ok    пустой каталог обновляет наш индекс"
+
+# Имя каталога — не разрешение переписывать в нём файлы. Чужой INDEX.md не наш,
+# а хук ходит по каталогам автоматически.
+fo=$(mktemp -d); mkdir -p "$fo/_kanon"; echo "ЧУЖОЙ" > "$fo/_kanon/INDEX.md"
+( cd "$fo" && python3 "$here_root/scripts/sweep.py" >/dev/null 2>&1 ) || true
+grep -q 'ЧУЖОЙ' "$fo/_kanon/INDEX.md" \
+  && echo "ok    чужой INDEX.md не тронут на пустом каталоге" \
+  || { echo "ОШИБКА чужой INDEX.md перезаписан"; fail=1; }
+cp tests/fixtures/good-ru.md "$fo/_kanon/c.md"
+( cd "$fo" && python3 "$here_root/scripts/sweep.py" >/dev/null 2>&1 ) || true
+grep -q 'ЧУЖОЙ' "$fo/_kanon/INDEX.md" \
+  && echo "ok    чужой INDEX.md не тронут и при живом чеклисте" \
+  || { echo "ОШИБКА чужой INDEX.md перезаписан при чеклисте"; fail=1; }
+
+# Приватный режим индекса не должен расширяться подменой: в нём имена задач.
+pm=$(mktemp -d); mkdir -p "$pm/_kanon"
+cp tests/fixtures/good-ru.md "$pm/_kanon/c.md"
+( cd "$pm" && python3 "$here_root/scripts/sweep.py" >/dev/null 2>&1 )
+chmod 600 "$pm/_kanon/INDEX.md"
+( cd "$pm" && python3 "$here_root/scripts/sweep.py" >/dev/null 2>&1 )
+[ "$(stat -c %a "$pm/_kanon/INDEX.md")" = "600" ] \
+  && echo "ok    режим индекса сохраняется при пересборке" \
+  || { echo "ОШИБКА режим индекса расширен до $(stat -c %a "$pm/_kanon/INDEX.md")"; fail=1; }
+
+# Режим с битами, которые снимает umask: без chmod после записи они терялись бы.
+chmod 666 "$pm/_kanon/INDEX.md"
+( cd "$pm" && umask 022 && python3 "$here_root/scripts/sweep.py" >/dev/null 2>&1 )
+[ "$(stat -c %a "$pm/_kanon/INDEX.md")" = "666" ] \
+  && echo "ok    umask не сужает унаследованный режим индекса" \
+  || { echo "ОШИБКА режим сужен до $(stat -c %a "$pm/_kanon/INDEX.md")"; fail=1; }
+command rm -rf "$fo" "$pm"
 
 # Заброшенный с шестью открытыми: шестой не должен пропасть молча.
 { head_of "много" null null
@@ -390,6 +422,53 @@ touch -d "20 days ago" "$eb/_kanon/many.md"
   && echo "ok    усечение списка открытых показано счётчиком" \
   || { echo "ОШИБКА шестой открытый пункт пропал молча"; fail=1; }
 command rm -rf "$cb" "$eb"
+
+# Находки третьего круга Codex.
+tb=$(mktemp -d); mkdir -p "$tb/_kanon"
+hf () { printf -- '---\ntask: t\nopened: 2026-09-02\nclosed: null\nslots: null\nsource: -\n---\n\n## Gathered\n- x · y\n\n## Acceptance\n- [x] 1. r · check: c · proof: коммит a1b2c3d\n\n## Failures\n%s\n' "$1"; }
+hf '[!] 1 · tried: x · returned: y' > "$tb/nodate.md"
+hf '[!] 1 · returned: y · 2026-09-02' > "$tb/notried.md"
+hf '[!] 1 · tried: x · 2026-09-02' > "$tb/noreturned.md"
+hf '[!] 1 · tried: x · returned: y · 2026-99-99' > "$tb/baddate.md"
+hf '[!] 1 · tried: x · returned: y · 2026-09-02' > "$tb/okdate.md"
+python3 scripts/check-checklist.py "$tb/nodate.md" >/dev/null 2>&1 \
+  && { echo "ОШИБКА провал без даты принят"; fail=1; } || echo "ok    провал без даты отвергнут"
+for probe in "notried:без пробовал" "noreturned:без вернулось"; do
+  f=${probe%%:*}; what=${probe#*:}
+  python3 scripts/check-checklist.py "$tb/$f.md" >/dev/null 2>&1 \
+    && { echo "ОШИБКА провал $what принят"; fail=1; } \
+    || echo "ok    провал $what отвергнут"
+done
+python3 scripts/check-checklist.py "$tb/baddate.md" >/dev/null 2>&1 \
+  && { echo "ОШИБКА провал с несуществующей датой принят"; fail=1; } || echo "ok    дата провала проверяется по календарю"
+python3 scripts/check-checklist.py "$tb/okdate.md" >/dev/null 2>&1 \
+  && echo "ok    корректный провал принят" || { echo "ОШИБКА корректный провал отвергнут:"; python3 scripts/check-checklist.py "$tb/okdate.md"; fail=1; }
+
+# Гигантское число не должно уносить разбор соседей.
+big=$(python3 -c "print('9'*5000)")
+printf -- '---\ntask: t\nopened: 2026-09-02\nclosed: null\nslots: null\nsource: -\n---\n\n## Gathered\n- x · y\n\n## Acceptance\n- [ ] %s. r · check: c\n' "$big" > "$tb/_kanon/huge.md"
+cp tests/fixtures/good-ru.md "$tb/_kanon/live.md"
+( cd "$tb" && python3 "$here_root/scripts/check-checklist.py" 2>&1 | grep -q 'live.md' ) \
+  && echo "ok    гигантское число не ослепляет соседний чеклист" \
+  || { echo "ОШИБКА огромное число унесло разбор каталога"; fail=1; }
+( cd "$tb" && python3 "$here_root/scripts/check-checklist.py" 2>&1 | grep -qi 'traceback' ) \
+  && { echo "ОШИБКА трейсбек на гигантском числе"; fail=1; } || echo "ok    гигантское число не даёт трейсбека"
+# Гигантское число — дефект формы, а не нечитаемый файл: без ограничения длины
+# оно доходило бы до int() и файл объявлялся бы «не прочитан».
+( cd "$tb" && python3 "$here_root/scripts/check-checklist.py" 2>&1 | grep -q 'не разобрано' ) \
+  && echo "ok    гигантское число — дефект формы, а не нечитаемый файл" \
+  || { echo "ОШИБКА гигантское число не опознано как дефект формы"; fail=1; }
+
+# Разные идентификаторы сессий не должны делить один маркер.
+mk=$(mktemp -d); tr3="$mk/tr.jsonl"
+for i in 1 2 3 4; do echo '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read"}]}}'; done > "$tr3"
+say () { echo "{\"session_id\":\"$1\",\"transcript_path\":\"$tr3\",\"tool_input\":{\"file_path\":\"$mk/src/a.py\"}}" \
+  | ( cd "$mk" && python3 "$here_root/hooks/kanon-hook.py" PreToolUse ); }
+a=$(say "collide-a/b"); b=$(say "collide-ab")
+[ -n "$a" ] && [ -n "$b" ] \
+  && echo "ok    похожие идентификаторы сессий не делят маркер" \
+  || { echo "ОШИБКА вторая сессия потеряла напоминание"; fail=1; }
+command rm -rf "$tb" "$mk" "${TMPDIR:-/tmp}/kanon-$(id -u)"
 
 # Каталог: новое имя, историческое, переопределение, INDEX не чеклист.
 tmp=$(mktemp -d)

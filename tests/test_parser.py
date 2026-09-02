@@ -174,6 +174,39 @@ path.write_text(HEAD.format(closed="null", slots="null").replace("- x · y", "- 
 d = parse(path)
 check("пустой буллет не считается собранным материалом", not d.gathered)
 
+# --- решение о ссылке привязано к открытому файлу -------------------------
+
+import os as _os  # noqa: E402
+from kanon_format import find, open_checklist  # noqa: E402
+
+box = pathlib.Path(tempfile.mkdtemp())
+(box / "_kanon").mkdir()
+outside = box / "outside.md"
+outside.write_text(HEAD.format(closed="null", slots="null")
+                   + "- [x] 1. чужой · check: c · proof: коммит a1b2c3d\n", encoding="utf-8")
+regular = box / "_kanon" / "c.md"
+regular.write_text(HEAD.format(closed="null", slots="null")
+                   + "- [x] 1. свой · check: c · proof: коммит a1b2c3d\n", encoding="utf-8")
+
+found, skipped = find(box)
+regular.unlink()
+regular.symlink_to(outside)          # подмена между обходом и чтением
+try:
+    open_checklist(found[0])
+    raced = True
+except OSError:
+    raced = False
+check("подмена симлинком между обходом и чтением отбивается", not raced)
+
+hard = box / "_kanon" / "hard.md"
+_os.link(outside, hard)
+try:
+    open_checklist(hard)
+    read_hard = True
+except OSError:
+    read_hard = False
+check("чеклист с несколькими именами не читается", not read_hard)
+
 if failures:
     print(f"\nпровалено: {len(failures)}")
     sys.exit(1)
