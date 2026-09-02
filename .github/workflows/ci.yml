@@ -24,6 +24,9 @@ jobs:
       - name: Самопроверка линтера, sweep и хуков
         run: bash tests/selftest.sh
 
+      - name: Мутации — тесты умеют краснеть
+        run: python3 tests/mutate.py
+
       - name: Манифесты — валидный JSON
         run: |
           for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json \
@@ -40,7 +43,7 @@ jobs:
 
       - name: В коммиты не уехали рабочие чеклисты
         run: |
-          if git ls-files | grep -qE '^(_kanon|\.kanon)/'; then
+          if git ls-files | grep -qE '(^|/)(_kanon|\.kanon)/'; then
             echo "ОШИБКА: каталог чеклистов под версионным контролем — это рабочие файлы"
             exit 1
           fi
