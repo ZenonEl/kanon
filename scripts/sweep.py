@@ -56,18 +56,30 @@ def write_index(docs: list) -> pathlib.Path | None:
     if not docs:
         lines.append("| — | — | — | пока пусто / empty |")
     target = folder / INDEX_NAME
-    # O_NOFOLLOW, а не проверка is_symlink перед записью: между проверкой и
-    # записью есть окно, а отказ на уровне ядра его не оставляет.
+    payload = "\n".join(lines) + "\n"
+
+    # Пишем во временный файл и подменяем именем, а не пишем в существующий.
     #
-    # Зачем вообще: INDEX.md — единственное место, где инструмент пишет сам, и
-    # пишет он его из хука при старте сессии, то есть в любом каталоге, куда
-    # человек зашёл. Симлинк, подложенный на месте INDEX.md, увёл бы запись в
-    # произвольный файл — воспроизведено. Каталог по симлинку допустим: это
-    # выбор раскладки самим хозяином, а вот файл — нет.
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(target, flags, 0o644)
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(lines) + "\n")
+    # Прямая запись уничтожает содержимое по ЛЮБОЙ ссылке на тот же inode.
+    # O_NOFOLLOW отбивает только символическую: жёсткая — это второе имя того же
+    # файла, и усечение доходит до него. Подмена именем меняет запись каталога,
+    # а не файл, на который она указывала, поэтому оба случая закрыты сразу.
+    # Заодно обрыв на середине не оставляет обрезанный индекс.
+    #
+    # INDEX.md пишется автоматически из хука при старте сессии, то есть в любом
+    # каталоге, куда зашла сессия, — цена ошибки здесь чужой файл.
+    tmp = folder / f".{INDEX_NAME}.tmp-{os.getpid()}"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+        os.replace(tmp, target)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
     return target
 
 

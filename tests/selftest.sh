@@ -250,6 +250,37 @@ if [ "$(cat "$lb/victim.txt")" = "не трогать" ]; then
 else
   echo "ОШИБКА sweep перезаписал файл по симлинку"; fail=1
 fi
+
+# Жёсткая ссылка — второе имя того же inode, и O_NOFOLLOW её не видит: запись
+# должна идти через подмену имени, иначе усечение доходит до жертвы.
+hl=$(mktemp -d); mkdir -p "$hl/_kanon"
+echo "не трогать" > "$hl/victim.txt"
+ln "$hl/victim.txt" "$hl/_kanon/INDEX.md"
+cp tests/fixtures/good-ru.md "$hl/_kanon/c.md"
+( cd "$hl" && python3 "$here_root/scripts/sweep.py" >/dev/null 2>&1 ) || true
+if [ "$(cat "$hl/victim.txt")" = "не трогать" ]; then
+  echo "ok    запись INDEX.md не идёт по жёсткой ссылке"
+else
+  echo "ОШИБКА sweep перезаписал файл по жёсткой ссылке"; fail=1
+fi
+ls "$hl/_kanon"/.INDEX.md.tmp-* >/dev/null 2>&1 \
+  && { echo "ОШИБКА временный файл индекса не убран"; fail=1; } \
+  || echo "ok    временный файл индекса не остаётся"
+# Путь очистки: подмена падает, временный файл не должен остаться мусором.
+dl=$(mktemp -d); mkdir -p "$dl/_kanon/INDEX.md"
+cp tests/fixtures/good-ru.md "$dl/_kanon/c.md"
+out_dir=$( cd "$dl" && python3 "$here_root/scripts/sweep.py" 2>&1 || true )
+echo "$out_dir" | grep -q 'в работе' \
+  && echo "ok    отчёт печатается, когда индекс не записать" \
+  || { echo "ОШИБКА отчёт потерян при непишущемся индексе"; fail=1; }
+if ls "$dl/_kanon"/.INDEX.md.tmp-* >/dev/null 2>&1; then
+  echo "ОШИБКА временный файл остался после неудачной подмены"; fail=1
+else
+  echo "ok    временный файл убран после неудачной подмены"
+fi
+command rm -rf "$dl"
+
+command rm -rf "$hl"
 out_sym=$( cd "$lb" && python3 "$here_root/scripts/sweep.py" 2>&1 || true )
 echo "$out_sym" | grep -q 'в работе\|STALE\|ЗАБРОШЕН' \
   && echo "ok    отчёт печатается и при отказе записи индекса" \
