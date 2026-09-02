@@ -54,6 +54,12 @@ git clone https://github.com/ZenonEl/kanon.git ~/.codex/plugins/kanon
 Проверка та же: в свежей сессии произнести фразу из триггеров и убедиться, что
 скил поднялся.
 
+Голый stdout доходит до расшифровки только у `SessionStart`, `UserPromptSubmit`
+и `UserPromptExpansion`; у остальных событий хост кладёт его в отладочный лог.
+Поэтому `PreToolUse` и `Stop` печатают JSON с полем `systemMessage`. Ни один не
+задаёт `decision` или `permissionDecision` — это завело бы блокировку, а здесь
+ничего не блокируется.
+
 Хуки под Codex не работают. `${CLAUDE_PLUGIN_ROOT}` — переменная Claude Code и
 здесь **не задана**: скрипты вызываются по пути, куда склонирован плагин,
 например `python3 ~/.codex/plugins/kanon/scripts/check-checklist.py`.

@@ -216,6 +216,13 @@ Three constraints, expensive to violate:
 3. **The pre-write reminder speaks once.** A reminder on every write is noise,
    and noise stops being read.
 
+And a fourth, learned the hard way: **a hook has to speak in the form the host
+listens to.** Plain stdout reaches the transcript only for a few event types;
+elsewhere it goes to a debug log. Two of these three hooks printed text nobody
+would ever see — and the tests, which asserted that the text was produced, were
+green throughout. A sensor whose output does not arrive is indistinguishable
+from a sensor that is not there.
+
 ## 12. Language
 
 A checklist is written in the language its author works in. Only the machine

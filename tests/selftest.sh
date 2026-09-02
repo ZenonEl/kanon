@@ -63,6 +63,25 @@ HOOKFIX
 here=$(pwd)
 out=$( cd "$hb" && echo '{}' | python3 "$here/hooks/kanon-hook.py" Stop )
 echo "$out" | grep -q '7\.'   && echo "ok    Stop называет незакрытый пункт"   || { echo "ОШИБКА Stop молчит при открытом пункте"; fail=1; }
+# Форма вывода, а не только его наличие. Голый stdout у Stop и PreToolUse хост
+# отправляет в отладочный лог: показывает он его только у SessionStart,
+# UserPromptSubmit и UserPromptExpansion. Текст, не доехавший до адресата,
+# неотличим от отсутствующего сенсора.
+if echo "$out" | python3 -c "import json,sys; d=json.load(sys.stdin); assert isinstance(d.get('systemMessage'),str) and d['systemMessage']; assert 'decision' not in d" 2>/dev/null; then
+  echo "ok    Stop отдаёт JSON с systemMessage и не блокирует"
+else
+  echo "ОШИБКА Stop печатает не JSON — вывод не доедет до адресата"; fail=1
+fi
+# У SessionStart вывод появляется только при заброшенном или истёкшем: без него
+# ассерт формы проверял бы пустую строку, то есть ничего.
+cp "$hb/_kanon/h.md" "$hb/_kanon/stale.md"; touch -d "30 days ago" "$hb/_kanon/stale.md"
+ss=$( cd "$hb" && echo '{}' | python3 "$here/hooks/kanon-hook.py" SessionStart )
+[ -n "$ss" ] && echo "ok    SessionStart говорит про заброшенное" \
+  || { echo "ОШИБКА SessionStart молчит при заброшенном чеклисте"; fail=1; }
+case "$ss" in
+  "{"*) echo "ОШИБКА SessionStart печатает JSON, хотя stdout у него доходит"; fail=1 ;;
+  *)    echo "ok    SessionStart печатает обычный текст" ;;
+esac
 
 # PreToolUse: сбор был, чеклиста нет — обязан сказать, и ровно один раз.
 pb=$(mktemp -d); tr="$pb/tr.jsonl"
@@ -72,6 +91,11 @@ pay="{\"session_id\":\"$sid\",\"transcript_path\":\"$tr\",\"tool_input\":{\"file
 first=$( cd "$pb" && echo "$pay" | python3 "$here/hooks/kanon-hook.py" PreToolUse )
 second=$( cd "$pb" && echo "$pay" | python3 "$here/hooks/kanon-hook.py" PreToolUse )
 [ -n "$first" ] && echo "ok    PreToolUse напоминает при сборе без чеклиста"   || { echo "ОШИБКА PreToolUse смолчал, хотя сбор был"; fail=1; }
+if echo "$first" | python3 -c "import json,sys; d=json.load(sys.stdin); assert isinstance(d.get('systemMessage'),str) and d['systemMessage']; assert 'permissionDecision' not in str(d)" 2>/dev/null; then
+  echo "ok    PreToolUse отдаёт JSON с systemMessage и не трогает разрешения"
+else
+  echo "ОШИБКА PreToolUse печатает не JSON — вывод не доедет до адресата"; fail=1
+fi
 [ -z "$second" ] && echo "ok    PreToolUse говорит один раз за сессию"   || { echo "ОШИБКА PreToolUse повторился в той же сессии"; fail=1; }
 command rm -rf "$hb" "$pb" "/tmp/kanon-reminded-$sid"
 
@@ -238,18 +262,39 @@ nag=$( cd "$nb" && echo "$pay2" | python3 "$here_root/hooks/kanon-hook.py" PreTo
   || { echo "ОШИБКА PreToolUse требует чеклист, хотя он есть"; fail=1; }
 command rm -rf "$nb" "/tmp/kanon-reminded-$sid2"
 
+# Обязательные поля frontmatter и пустой Gathered: каждая проверка линтера
+# должна иметь свой ассерт, иначе её снятие проходит молча.
+fb=$(mktemp -d)
+mk () { printf -- '---\ntask: %s\nopened: %s\nclosed: %s\nslots: null\nsource: -\n---\n\n## Gathered\n%s\n\n## Acceptance\n- [x] 1. r · check: c · proof: коммит a1b2c3d\n' "$1" "$2" "$3" "$4"; }
+mk ""        2026-09-02 null "- x · y" > "$fb/notask.md"
+mk t         неdata     null "- x · y" > "$fb/badopened.md"
+mk t         2026-09-02 позавчера "- x · y" > "$fb/badclosed.md"
+mk t         2026-09-02 null ""        > "$fb/emptygathered.md"
+printf -- '---\ntask: сделай три варианта\nopened: 2026-09-02\nclosed: null\nsource: -\n---\n\n## Gathered\n- x · y\n\n## Acceptance\n- [x] 1. r · check: c · proof: коммит a1b2c3d\n' > "$fb/noslots.md"
+for probe in "notask:поля task" "badopened:даты opened" "badclosed:даты closed" \
+             "emptygathered:пустого Gathered" "noslots:пропущенного slots"; do
+  f=${probe%%:*}; what=${probe#*:}
+  python3 scripts/check-checklist.py "$fb/$f.md" >/dev/null 2>&1 \
+    && { echo "ОШИБКА линтер не заметил $what"; fail=1; } \
+    || echo "ok    линтер ловит отсутствие $what"
+done
+command rm -rf "$fb"
+
 # Каталог: новое имя, историческое, переопределение, INDEX не чеклист.
 tmp=$(mktemp -d)
 mkdir -p "$tmp/_kanon" "$tmp/legacy/.kanon" "$tmp/env/custom"
-cp tests/fixtures/good-ru.md "$tmp/_kanon/x.md"
-cp tests/fixtures/good-ru.md "$tmp/legacy/.kanon/x.md"
-cp tests/fixtures/good-ru.md "$tmp/env/custom/x.md"
+# Дефектная фикстура намеренно: на валидной тест зелёный и когда каталог найден,
+# и когда обнаружение сломано вовсе — «чеклистов нет» тоже даёт код 0.
+cp tests/fixtures/bad-ru.md "$tmp/_kanon/x.md"
+cp tests/fixtures/bad-ru.md "$tmp/legacy/.kanon/x.md"
+cp tests/fixtures/bad-ru.md "$tmp/env/custom/x.md"
+cp tests/fixtures/good-ru.md "$tmp/_kanon/ok.md"
 here=$(pwd)
-( cd "$tmp" && python3 "$here/scripts/check-checklist.py" >/dev/null 2>&1 ) \
+( cd "$tmp" && python3 "$here/scripts/check-checklist.py" 2>&1 | grep -q 'пустое утверждение' ) \
   && echo "ok    каталог _kanon найден" || { echo "ОШИБКА _kanon не найден"; fail=1; }
-( cd "$tmp/legacy" && python3 "$here/scripts/check-checklist.py" >/dev/null 2>&1 ) \
+( cd "$tmp/legacy" && python3 "$here/scripts/check-checklist.py" 2>&1 | grep -q 'пустое утверждение' ) \
   && echo "ok    историческое .kanon принимается" || { echo "ОШИБКА .kanon не принят"; fail=1; }
-( cd "$tmp/env" && KANON_DIR=custom python3 "$here/scripts/check-checklist.py" >/dev/null 2>&1 ) \
+( cd "$tmp/env" && KANON_DIR=custom python3 "$here/scripts/check-checklist.py" 2>&1 | grep -q 'пустое утверждение' ) \
   && echo "ok    KANON_DIR переопределяет" || { echo "ОШИБКА KANON_DIR"; fail=1; }
 ( cd "$tmp" && python3 "$here/scripts/sweep.py" >/dev/null 2>&1 )
 [ -f "$tmp/_kanon/INDEX.md" ] && echo "ok    INDEX.md собран" \

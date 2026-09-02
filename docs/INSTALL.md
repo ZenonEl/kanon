@@ -80,6 +80,12 @@ operations happened in the session, or it already spoke once.
 
 A hook that fails exits 0 and says nothing. A broken hook is worse than no hook.
 
+Plain stdout only reaches the transcript for `SessionStart`, `UserPromptSubmit`
+and `UserPromptExpansion`; for everything else the host writes it to the debug
+log. So `PreToolUse` and `Stop` emit JSON with a `systemMessage` field instead.
+Neither sets `decision` or `permissionDecision` — that would block, and nothing
+here blocks.
+
 ## If the skill does not fire
 
 Diagnose in this order, most common first:

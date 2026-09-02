@@ -111,8 +111,9 @@ source: <where the material came from: branch, issue, export, link>
    Acceptance section must hold that many lines, empty ones included. An empty
    slot is visible; an intention to do "as many as I manage" is not.
 
-   `slots: null` means the task named no quantity. Omitting the field when the
-   task did name one is a defect: the rule becomes unverifiable.
+   **The key is always present.** `slots: null` means the task named no
+   quantity; omitting the key altogether makes the rule unverifiable and is
+   rejected by the linter — the two are not the same thing.
 
 3. **An item is closed by proof, not by a tick.** `[x]` without a `proof:` field
    is invalid and reads as open. Proof is command output, a path to a file or

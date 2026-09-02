@@ -9,6 +9,16 @@
   PreToolUse    — сбор был, файла нет, а уже пишем: напомнить (один раз);
   Stop          — в чеклисте остались незакрытые пункты: перечислить.
 
+Как хук говорит. Голый stdout доходит до адресата НЕ у всех событий: хост
+показывает его только у SessionStart, UserPromptSubmit и UserPromptExpansion, а
+у остальных отправляет в отладочный лог. Поэтому PreToolUse и Stop печатают JSON
+с полем systemMessage — оно валидируется хостом и показывается человеку.
+Проверено чтением поставленного бандла; сквозного прогона внутри живой сессии
+не делалось.
+
+Поле decision у Stop и permissionDecision у PreToolUse НЕ задаются намеренно:
+любое из них завело бы блокировку, а правило проекта — ничего не блокировать.
+
 Три правила, нарушать которые дорого:
 
 1. **Ничего не блокируется.** Хук, мешающий работать, выключают вместе с
@@ -170,6 +180,19 @@ HANDLERS = {
     "Stop": on_stop,
 }
 
+# У SessionStart голый stdout доходит сам; у остальных — только через JSON.
+PLAIN_STDOUT_EVENTS = {"SessionStart"}
+SYSTEM_MESSAGE_LIMIT = 4000
+
+
+def emit(event: str, message: str) -> None:
+    """Напечатать так, чтобы адресат это увидел."""
+    if event in PLAIN_STDOUT_EVENTS:
+        print(message)
+        return
+    print(json.dumps({"systemMessage": message[:SYSTEM_MESSAGE_LIMIT]},
+                     ensure_ascii=False))
+
 
 def main() -> int:
     try:
@@ -180,7 +203,7 @@ def main() -> int:
         if handler:
             message = handler(payload)
             if message:
-                print(message)
+                emit(event, message)
     except Exception:  # noqa: BLE001
         pass  # сломанный хук хуже отсутствующего
     return 0

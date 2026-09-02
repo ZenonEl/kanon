@@ -121,6 +121,23 @@ check("проставленный closed сильнее возраста", d.sta
 d = doc("- [x] 1. кнопка работает · check: скрин · подтв: out/скрин.png, коммит a1b2c3d\n")
 check("смешанные ключи и кириллица в значении", d.items[0].has_proof)
 
+# --- границы, которые держат таблицы States и Lifetime -------------------
+
+d = doc("- [ ] 1. r · check: c\n", age_days=14)
+check("граница stale ровно на 14 дне", d.state == "stale", f"state={d.state}")
+
+d = doc("- [ ] 1. r · check: c\n", age_days=13)
+check("13 дней — ещё open", d.state == "open", f"state={d.state}")
+
+today = dt.date.today()
+d = doc("- [x] 1. r · check: c · proof: коммит a1b2c3d\n",
+        closed=str(today - dt.timedelta(days=7)))
+check("closed истекает ровно на седьмой день", d.expires_in == 0, f"expires_in={d.expires_in}")
+
+d = doc("- [x] 1. r · check: c · proof: коммит a1b2c3d\n",
+        closed=str(today - dt.timedelta(days=6)))
+check("на шестой день ещё не истёк", d.expires_in == 1, f"expires_in={d.expires_in}")
+
 if failures:
     print(f"\nпровалено: {len(failures)}")
     sys.exit(1)

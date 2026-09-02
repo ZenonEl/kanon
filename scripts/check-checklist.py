@@ -42,6 +42,13 @@ def check(doc: Checklist) -> list[tuple[str, str]]:
         errors.append(f"closed={doc.closed_on!r} — не дата вида YYYY-MM-DD / not a date")
 
     # Правило 2: число в задаче становится числом слотов.
+    # Отсутствие ключа и `slots: null` — разные вещи, и спека их различает:
+    # null означает «количество не называлось», а пропуск делает правило
+    # непроверяемым. Без этого задача «сделай три варианта» с одним пунктом
+    # проходила как «ok» — буквально симптом, ради которого правило есть.
+    if "slots" not in doc.meta:
+        errors.append("нет поля slots — поставь число, если задача называла "
+                      "количество, иначе null / missing slots key")
     slots = (doc.meta.get("slots") or "").strip().lower()
     if slots in ("", "null", "none", "-"):
         pass  # задача не называла количества
