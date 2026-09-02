@@ -18,10 +18,18 @@ Usage:
 from __future__ import annotations
 
 import pathlib
+import re
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from kanon_format import _DATE, Checklist, find, parse  # noqa: E402
+from kanon_format import Checklist, find, parse, valid_date  # noqa: E402
+
+# Признаки того, что задача называет количество. Список неполон намеренно:
+# он даёт повод для предупреждения, а решает человек.
+QUANTITY = re.compile(
+    r"\b(\d+|two|three|four|five|six|seven|eight|nine|ten|"
+    r"два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|"
+    r"несколько|several|multiple)\b", re.I)
 
 
 def check(doc: Checklist) -> list[tuple[str, str]]:
@@ -35,11 +43,11 @@ def check(doc: Checklist) -> list[tuple[str, str]]:
         errors.append("нет поля task / missing task")
 
     opened = doc.meta.get("opened", "")
-    if not _DATE.match(opened):
-        errors.append(f"opened={opened!r} — не дата вида YYYY-MM-DD / not a date")
+    if not valid_date(opened):
+        errors.append(f"opened={opened!r} — не существующая дата YYYY-MM-DD / not a real date")
 
-    if doc.closed_on and not _DATE.match(doc.closed_on):
-        errors.append(f"closed={doc.closed_on!r} — не дата вида YYYY-MM-DD / not a date")
+    if doc.closed_on and not valid_date(doc.closed_on):
+        errors.append(f"closed={doc.closed_on!r} — не существующая дата YYYY-MM-DD / not a real date")
 
     # Правило 2: число в задаче становится числом слотов.
     # Отсутствие ключа и `slots: null` — разные вещи, и спека их различает:
@@ -51,8 +59,15 @@ def check(doc: Checklist) -> list[tuple[str, str]]:
                       "количество, иначе null / missing slots key")
     slots = (doc.meta.get("slots") or "").strip().lower()
     if slots in ("", "null", "none", "-"):
-        pass  # задача не называла количества
-    elif not slots.isdigit():
+        # `null` при задаче, называющей количество, — предупреждение, а не
+        # отказ: числительное в тексте машина видит, а вправду ли оно про число
+        # результатов — нет. Отказ на догадке научил бы пропускать проверку.
+        found = QUANTITY.search(doc.meta.get("task", ""))
+        if found:
+            warn.append(f"в задаче есть «{found.group(0)}», а slots=null — "
+                        f"если это про число результатов, поставь его / "
+                        f"task names a quantity but slots is null")
+    elif not (slots.isascii() and slots.isdigit()):
         errors.append(f"slots={slots!r} — не целое число / not an integer")
     elif int(slots) != len(doc.items):
         errors.append(
@@ -78,11 +93,31 @@ def check(doc: Checklist) -> list[tuple[str, str]]:
               f"proof={value!r} — пустое утверждение / empty affirmation"
         errors.append(f"строка {item.line}: пункт {item.number} отмечен, но {why}")
 
-    # Правило 5: провал ссылается на существующий пункт.
-    numbers = {i.number for i in doc.items}
-    for number, _ in doc.failures:
+    # Правило 5: провал ссылается на существующий пункт и несёт попытку.
+    numbers = [i.number for i in doc.items]
+    for number, fields in doc.failures:
         if number not in numbers:
             errors.append(f"провал ссылается на несуществующий пункт {number} / dangling failure")
+        missing = [k for k in ("tried", "returned") if not fields.get(k)]
+        if missing:
+            errors.append(f"провал по пункту {number} без полей {', '.join(missing)} — "
+                          f"след без попытки следом не является / failure without an attempt")
+
+    # Номера пунктов уникальны: на них ссылаются провалы и вывод приёмки, и
+    # два одинаковых делают ссылку бессмысленной.
+    duplicates = sorted({n for n in numbers if numbers.count(n) > 1})
+    if duplicates:
+        errors.append(f"номера пунктов повторяются: {duplicates} — "
+                      f"ссылка на пункт перестаёт быть однозначной / duplicate item numbers")
+
+    # Правило 4: пункт без проверки обязан быть помечен. Иначе непроверяемое
+    # намерение выглядит как обычный пункт и не попадает в долю «без проверки».
+    for item in doc.items:
+        if item.empty_slot or item.no_check:
+            continue
+        if not item.fields.get("check"):
+            errors.append(f"строка {item.line}: пункт {item.number} без «check:» и без "
+                          f"пометки [no check] / neither a check nor the marker")
 
     # Правило 6: «я помню» не источник.
     if doc.had_gathered_section and not doc.gathered:
@@ -110,20 +145,39 @@ def check(doc: Checklist) -> list[tuple[str, str]]:
 def main(argv: list[str]) -> int:
     quiet = "--quiet" in argv
     args = [a for a in argv if not a.startswith("--")]
-    paths = [pathlib.Path(a) for a in args] or find()
-
-    if not paths:
-        if not quiet:
-            print("чеклистов нет / no checklists")
-        return 0
+    skipped: list[pathlib.Path] = []
+    if args:
+        paths = [pathlib.Path(a) for a in args]
+    else:
+        paths, skipped = find()
 
     failed = False
+
+    # Симлинк не читается, но и не исчезает: молчаливый пропуск неотличим от
+    # отсутствия файла, а именно это правило проект и защищает.
+    for link in skipped:
+        print(f"  {link}: симлинк пропущен — чеклист читается только как "
+              f"обычный файл / symlink skipped, not read")
+        failed = True
+
+    if not paths:
+        if not quiet and not skipped:
+            print("чеклистов нет / no checklists")
+        return 1 if failed else 0
+
     for path in paths:
         if not path.exists():
-            print(f"{path}: файла нет / missing")
+            print(f"  {path}: файла нет / missing")
             failed = True
             continue
-        doc = parse(path)
+        try:
+            doc = parse(path)
+        except (OSError, UnicodeDecodeError) as exc:
+            # Отдельный файл, а не весь каталог: один нечитаемый чеклист не
+            # должен ослеплять проверку на остальных.
+            print(f"  {path}: не прочитан ({exc.__class__.__name__}) / unreadable")
+            failed = True
+            continue
         problems = check(doc)
         if any(level == "error" for level, _ in problems):
             failed = True

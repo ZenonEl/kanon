@@ -46,10 +46,13 @@ git clone https://github.com/ZenonEl/kanon.git
 ## Codex
 
 ```
-git clone https://github.com/ZenonEl/kanon.git ~/.codex/plugins/kanon
+codex plugin marketplace add https://github.com/ZenonEl/kanon.git
+codex plugin add kanon --marketplace kanon
 ```
 
-Либо, если хост читает маркетплейсы, указать на `.agents/plugins/marketplace.json`.
+Простого клона в каталог плагинов **недостаточно**: хост находит плагины через
+маркетплейс, а скопированное дерево он не видит и отвечает
+`No marketplace plugins found`. Проверено на текущем CLI.
 
 Проверка та же: в свежей сессии произнести фразу из триггеров и убедиться, что
 скил поднялся.

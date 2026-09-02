@@ -138,6 +138,42 @@ d = doc("- [x] 1. r · check: c · proof: коммит a1b2c3d\n",
         closed=str(today - dt.timedelta(days=6)))
 check("на шестой день ещё не истёк", d.expires_in == 1, f"expires_in={d.expires_in}")
 
+# --- находки Codex: границы представлений ---------------------------------
+
+d = doc("- [ ] 1. результат без проверки и без пометки\n")
+check("пункт без check: и без [no check] распознан как таковой",
+      not d.items[0].fields.get("check") and not d.items[0].no_check)
+
+path = pathlib.Path(tempfile.mkdtemp()) / "f.md"
+path.write_text(HEAD.format(closed="null", slots="null")
+                + "- [x] 1. r · check: c · proof: коммит a1b2c3d\n"
+                + "\n## Failures\n\n[!] 1 · tried: собрать · returned: ошибка · 2026-09-02\n",
+                encoding="utf-8")
+d = parse(path)
+check("поля провала разбираются",
+      d.failures and d.failures[0][1].get("tried") and d.failures[0][1].get("returned"),
+      f"failures={d.failures}")
+
+path = pathlib.Path(tempfile.mkdtemp()) / "g.md"
+path.write_text(HEAD.format(closed="null", slots="null")
+                + "- [x] 1. r · check: c · proof: коммит a1b2c3d\n"
+                + "\n## Failures\n\n[!] один · tried: x · returned: y\n", encoding="utf-8")
+d = parse(path)
+check("нечитаемая запись провала не исчезает", len(d.malformed) == 1, f"malformed={d.malformed}")
+
+from kanon_format import valid_date  # noqa: E402
+check("2026-99-99 — не дата", not valid_date("2026-99-99"))
+check("2026-09-02 — дата", valid_date("2026-09-02"))
+
+d = doc("- [x] 1. r · check: c · proof: p.png\n", closed="2026-99-99")
+check("невалидная closed не роняет expires_in", d.expires_in is None)
+
+path = pathlib.Path(tempfile.mkdtemp()) / "h.md"
+path.write_text(HEAD.format(closed="null", slots="null").replace("- x · y", "- ")
+                + "- [x] 1. r · check: c · proof: коммит a1b2c3d\n", encoding="utf-8")
+d = parse(path)
+check("пустой буллет не считается собранным материалом", not d.gathered)
+
 if failures:
     print(f"\nпровалено: {len(failures)}")
     sys.exit(1)

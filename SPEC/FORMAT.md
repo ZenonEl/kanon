@@ -1,6 +1,6 @@
 # Checklist format
 
-**Format version:** 0.4
+**Format version:** 0.5
 **Status:** normative. The single source of truth about the file.
 **License:** CC BY-SA 4.0 (see [`LICENSE`](LICENSE))
 
@@ -187,13 +187,19 @@ about kanon and does not need to. Its absence does not affect anything.
 - an Acceptance section exists and is not empty;
 - every line in it that begins with `- [` parses as an item — a line that looks
   like an item but does not parse is an error, never a silent skip;
-- `slots:` present when the task names a quantity, and matching the number of
-  acceptance lines;
+- the `slots:` key is present (`null` is a valid value) and, when numeric,
+  matches the number of acceptance lines. A quantity word in `task:` with
+  `slots: null` raises a **warning**, not an error: a machine sees the numeral,
+  not whether it counts results;
 - no `[x]` without `proof:`;
 - `proof:` not in the stop list of empty affirmations, in any supported
   language. **The stop list is the only criterion** — there is no minimum
   length: `h.png` and `#482` are valid proofs;
-- failure entries reference existing item numbers;
+- failure entries parse, reference existing item numbers, and carry both
+  `tried:` and `returned:` — a trace with no attempt in it is not a trace;
+- item numbers are unique: failures and acceptance output reference them;
+- an item carries either `check:` or the `[no check]` marker;
+- dates are real dates, not merely `YYYY-MM-DD`-shaped;
 - Gathered is not empty.
 
 It cannot check whether a proof is real or an item well chosen. A machine sees

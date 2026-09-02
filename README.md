@@ -1,6 +1,6 @@
 # kanon
 
-[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/code-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](SPEC/LICENSE)
 

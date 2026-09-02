@@ -22,6 +22,7 @@ Usage:
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import sys
 
@@ -55,19 +56,43 @@ def write_index(docs: list) -> pathlib.Path | None:
     if not docs:
         lines.append("| — | — | — | пока пусто / empty |")
     target = folder / INDEX_NAME
-    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # O_NOFOLLOW, а не проверка is_symlink перед записью: между проверкой и
+    # записью есть окно, а отказ на уровне ядра его не оставляет.
+    #
+    # Зачем вообще: INDEX.md — единственное место, где инструмент пишет сам, и
+    # пишет он его из хука при старте сессии, то есть в любом каталоге, куда
+    # человек зашёл. Симлинк, подложенный на месте INDEX.md, увёл бы запись в
+    # произвольный файл — воспроизведено. Каталог по симлинку допустим: это
+    # выбор раскладки самим хозяином, а вот файл — нет.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(target, flags, 0o644)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
     return target
 
 
 def main(argv: list[str]) -> int:
     quiet = "--quiet" in argv
-    paths = find()
-    if not paths:
+    paths, skipped = find()
+
+    docs = []
+    unreadable: list[str] = []
+    for path in paths:
+        try:
+            docs.append(parse(path))
+        except (OSError, UnicodeDecodeError) as exc:
+            # Пофайлово: один битый чеклист не должен уносить отчёт по всем.
+            unreadable.append(f"{path.name} ({exc.__class__.__name__})")
+
+    if not docs and not skipped and not unreadable:
+        if "--no-index" not in argv:
+            try:
+                write_index([])  # каталог опустел — индекс обязан это отразить
+            except OSError:
+                pass
         if not quiet:
             print("чеклистов нет / no checklists")
         return 0
-
-    docs = [parse(p) for p in paths]
     buckets: dict[str, list] = {"open": [], "closed": [], "stale": []}
     for doc in docs:
         buckets[doc.state].append(doc)
@@ -78,6 +103,7 @@ def main(argv: list[str]) -> int:
         try:
             write_index(docs)
         except OSError as exc:
+            # ELOOP отсюда же: симлинк на месте INDEX.md.
             # Отчёт важнее производного файла: раньше падение записи уносило с
             # собой весь вывод про заброшенное и истёкшее, ради которого команду
             # и вызывают.
@@ -89,6 +115,10 @@ def main(argv: list[str]) -> int:
         lines.append(f"      {doc.meta.get('task', '')}")
         for item in doc.open_items[:5]:
             lines.append(f"      открыт: {item.number}. {item.text or '<пустой слот>'}")
+        if len(doc.open_items) > 5:
+            # Спека обещает «показывается с перечнем открытых пунктов»: молча
+            # обрезать список значит спрятать недостачу за шестым.
+            lines.append(f"      …и ещё {len(doc.open_items) - 5}")
         lines.append("      → закрыть, вытащить доказательства или выбросить")
 
     # closed — предложить исход по истечении.
@@ -107,6 +137,12 @@ def main(argv: list[str]) -> int:
             closed = len([i for i in doc.items if i.closed])
             lines.append(f"  в работе  {doc.path.name}  "
                          f"{closed}/{len(doc.items)} закрыто доказательством")
+
+    for link in skipped:
+        lines.append(f"  симлинк пропущен: {link.name} — чеклист читается только "
+                     f"как обычный файл / symlink skipped")
+    for bad in unreadable:
+        lines.append(f"  не прочитан: {bad} / unreadable")
 
     if index_failed:
         lines.append(index_failed)

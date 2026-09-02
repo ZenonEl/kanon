@@ -64,6 +64,22 @@ _ITEM = re.compile(r"^-\s*\[([ xX])\]\s*(\d+)\.\s*(.*)$")
 _FAILURE = re.compile(r"^\[!\]\s*(\d+)\s*·?\s*(.*)$")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
+
+def valid_date(value: str) -> bool:
+    """Дата, а не строка, похожая на дату.
+
+    Проверки формы мало: `2026-99-99` ей удовлетворяет, проходит линтер, а потом
+    роняет sweep на fromisoformat — и хук, глотающий исключение, теряет весь
+    отчёт вместе с ним.
+    """
+    if not _DATE.match(value or ""):
+        return False
+    try:
+        _dt.date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
 _FIELD_LOOKUP = {a: key for key, aliases in FIELD_ALIASES.items() for a in aliases}
 
 
@@ -125,7 +141,7 @@ class Checklist:
     meta: dict[str, str] = field(default_factory=dict)
     gathered: list[str] = field(default_factory=list)
     items: list[Item] = field(default_factory=list)
-    failures: list[tuple[int, str]] = field(default_factory=list)
+    failures: list[tuple[int, dict[str, str]]] = field(default_factory=list)
     had_gathered_section: bool = False
     had_acceptance_section: bool = False
     malformed: list[tuple[int, str]] = field(default_factory=list)
@@ -172,7 +188,7 @@ class Checklist:
     @property
     def expires_in(self) -> int | None:
         """Дней до истечения тары. None — не истекает."""
-        if not self.closed_on or not _DATE.match(self.closed_on):
+        if not valid_date(self.closed_on):
             return None
         closed = _dt.date.fromisoformat(self.closed_on)
         return 7 - (_dt.date.today() - closed).days
@@ -240,7 +256,9 @@ def parse(path: pathlib.Path) -> Checklist:
             continue
 
         if section == "gathered" and raw.strip().startswith("-"):
-            doc.gathered.append(raw.strip()[1:].strip())
+            entry = raw.strip()[1:].strip()
+            if entry:  # пустой буллет материалом не является
+                doc.gathered.append(entry)
             continue
 
         if section == "acceptance":
@@ -263,9 +281,16 @@ def parse(path: pathlib.Path) -> Checklist:
             continue
 
         if section == "failures":
-            fail = _FAILURE.match(raw.strip())
+            stripped = raw.strip()
+            fail = _FAILURE.match(stripped)
             if fail:
-                doc.failures.append((int(fail.group(1)), fail.group(2).strip()))
+                _, fields, _nc = _split_fields("x · " + fail.group(2))
+                doc.failures.append((int(fail.group(1)), fields))
+            elif stripped.startswith("[!]"):
+                # Строка выглядит записью провала и не разобралась: пропустить
+                # её молча значит потерять след попытки, ради которого раздел
+                # и существует.
+                doc.malformed.append((n, stripped))
 
     return doc
 
@@ -289,9 +314,24 @@ def directory(root: pathlib.Path | None = None) -> pathlib.Path | None:
     return None
 
 
-def find(root: pathlib.Path | None = None) -> list[pathlib.Path]:
+def find(root: pathlib.Path | None = None) -> tuple[list[pathlib.Path], list[pathlib.Path]]:
+    """Чеклисты и отдельно — пропущенные симлинки.
+
+    Симлинк в каталоге чеклистов не читается. Хуки запускаются автоматически в
+    любом каталоге, куда зашла сессия, а `read_text` идёт по ссылке: подложенный
+    `link.md` на файл вне проекта выдал бы его содержимое в чужую сессию.
+    Пропуск не молчаливый — пропущенные возвращаются отдельным списком и
+    показываются.
+    """
     folder = directory(root)
     if folder is None:
-        return []
-    return sorted(p for p in folder.glob("*.md")
-                  if p.is_file() and p.name != INDEX_NAME)
+        return [], []
+    found, skipped = [], []
+    for path in sorted(folder.glob("*.md")):
+        if path.name == INDEX_NAME:
+            continue
+        if path.is_symlink():
+            skipped.append(path)
+        elif path.is_file():
+            found.append(path)
+    return found, skipped

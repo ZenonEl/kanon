@@ -238,6 +238,24 @@ echo "$out" | grep -q 'STALE\|ЗАБРОШЕН' \
   || { echo "ОШИБКА sweep потерял отчёт:"; echo "$out"; fail=1; }
 command rm -rf "$wb"
 
+# INDEX.md пишется автоматически из хука в любом каталоге, куда зашла сессия.
+# Симлинк на его месте уводил запись в произвольный файл — проверяем отказ.
+lb=$(mktemp -d); mkdir -p "$lb/_kanon"
+echo "не трогать" > "$lb/victim.txt"
+ln -s "$lb/victim.txt" "$lb/_kanon/INDEX.md"
+cp tests/fixtures/good-ru.md "$lb/_kanon/c.md"
+( cd "$lb" && python3 "$here_root/scripts/sweep.py" >/dev/null 2>&1 ) || true
+if [ "$(cat "$lb/victim.txt")" = "не трогать" ]; then
+  echo "ok    запись INDEX.md не идёт по симлинку"
+else
+  echo "ОШИБКА sweep перезаписал файл по симлинку"; fail=1
+fi
+out_sym=$( cd "$lb" && python3 "$here_root/scripts/sweep.py" 2>&1 || true )
+echo "$out_sym" | grep -q 'в работе\|STALE\|ЗАБРОШЕН' \
+  && echo "ok    отчёт печатается и при отказе записи индекса" \
+  || { echo "ОШИБКА отчёт потерян при симлинке"; fail=1; }
+command rm -rf "$lb"
+
 # PreToolUse не должен требовать новый чеклист при живом заброшенном.
 nb=$(mktemp -d); mkdir -p "$nb/_kanon"; tr2="$nb/tr.jsonl"
 cat > "$nb/_kanon/s.md" <<'NAG'
@@ -279,6 +297,68 @@ for probe in "notask:поля task" "badopened:даты opened" "badclosed:да�
     || echo "ok    линтер ловит отсутствие $what"
 done
 command rm -rf "$fb"
+
+# Находки Codex, проверяемые через линтер и sweep.
+cb=$(mktemp -d); mkdir -p "$cb/_kanon"
+head_of () { printf -- '---\ntask: %s\nopened: 2026-09-02\nclosed: %s\nslots: %s\nsource: -\n---\n\n## Gathered\n- x · y\n\n## Acceptance\n' "$1" "$2" "$3"; }
+{ head_of t null null; printf -- '- [ ] 1. результат без проверки\n'; } > "$cb/nocheck.md"
+{ head_of t null null; printf -- '- [x] 1. r · check: c · proof: коммит a1b2c3d\n- [x] 1. дубль · check: c · proof: коммит deadbee\n'; } > "$cb/dup.md"
+{ head_of t 2026-99-99 null; printf -- '- [x] 1. r · check: c · proof: коммит a1b2c3d\n'; } > "$cb/baddate.md"
+{ head_of "сделай три варианта" null null; printf -- '- [x] 1. r · check: c · proof: коммит a1b2c3d\n'; } > "$cb/qty.md"
+{ head_of t null null; printf -- '- [x] 1. r · check: c · proof: коммит a1b2c3d\n\n## Failures\n\n[!] 1\n'; } > "$cb/nofail.md"
+{ head_of t null "²"; printf -- '- [x] 1. r · check: c · proof: коммит a1b2c3d\n'; } > "$cb/unislots.md"
+for probe in "nocheck:пункт без check и без пометки" "dup:повтор номеров" \
+             "baddate:несуществующую дату" "nofail:провал без полей попытки" \
+             "unislots:юникод-цифру в slots"; do
+  f=${probe%%:*}; what=${probe#*:}
+  python3 scripts/check-checklist.py "$cb/$f.md" >/dev/null 2>&1 \
+    && { echo "ОШИБКА линтер пропустил $what"; fail=1; } \
+    || echo "ok    линтер ловит $what"
+done
+python3 scripts/check-checklist.py "$cb/qty.md" 2>&1 | grep -q 'три' \
+  && echo "ok    количество в задаче при slots=null — предупреждение" \
+  || { echo "ОШИБКА не предупредил про количество в задаче"; fail=1; }
+python3 scripts/check-checklist.py "$cb/unislots.md" 2>&1 | grep -qi 'traceback' \
+  && { echo "ОШИБКА юникод-цифра роняет линтер трейсбеком"; fail=1; } \
+  || echo "ok    юникод-цифра даёт ошибку, а не трейсбек"
+
+# Битый файл не должен ослеплять остальные.
+printf '\xff\xfe не utf-8' > "$cb/_kanon/broken.md"
+cp tests/fixtures/good-ru.md "$cb/_kanon/live.md"
+( cd "$cb" && python3 "$here_root/scripts/check-checklist.py" 2>&1 | grep -q 'live.md' ) \
+  && echo "ok    битый чеклист не ослепляет соседние" \
+  || { echo "ОШИБКА один битый файл скрыл остальные"; fail=1; }
+st=$( cd "$cb" && echo '{}' | python3 "$here_root/hooks/kanon-hook.py" Stop )
+echo "$st" | grep -q 'systemMessage' \
+  && echo "ok    хук видит живой чеклист рядом с битым" \
+  || { echo "ОШИБКА хук онемел из-за одного битого файла"; fail=1; }
+
+# Симлинк-чеклист не читается: он мог бы выдать файл вне проекта.
+echo "PRIVATE" > "$cb/secret.md"
+ln -s "$cb/secret.md" "$cb/_kanon/link.md"
+( cd "$cb" && python3 "$here_root/scripts/check-checklist.py" 2>&1 | grep -q 'PRIVATE' ) \
+  && { echo "ОШИБКА содержимое по симлинку прочитано"; fail=1; } \
+  || echo "ok    чеклист по симлинку не читается"
+( cd "$cb" && python3 "$here_root/scripts/check-checklist.py" 2>&1 | grep -q 'симлинк пропущен' ) \
+  && echo "ok    пропуск симлинка показан, а не молчаливый" \
+  || { echo "ОШИБКА симлинк пропущен молча"; fail=1; }
+
+# Опустевший каталог обязан обновить индекс, а не оставить старый.
+eb=$(mktemp -d); mkdir -p "$eb/_kanon"; echo "старое" > "$eb/_kanon/INDEX.md"
+( cd "$eb" && python3 "$here_root/scripts/sweep.py" >/dev/null 2>&1 )
+grep -q 'старое' "$eb/_kanon/INDEX.md" \
+  && { echo "ОШИБКА индекс не обновлён на пустом каталоге"; fail=1; } \
+  || echo "ok    пустой каталог обновляет индекс"
+
+# Заброшенный с шестью открытыми: шестой не должен пропасть молча.
+{ head_of "много" null null
+  for i in 1 2 3 4 5 6; do printf -- '- [ ] %d. пункт · check: c\n' "$i"; done
+} > "$eb/_kanon/many.md"
+touch -d "20 days ago" "$eb/_kanon/many.md"
+( cd "$eb" && python3 "$here_root/scripts/sweep.py" 2>&1 | grep -q 'и ещё' ) \
+  && echo "ok    усечение списка открытых показано счётчиком" \
+  || { echo "ОШИБКА шестой открытый пункт пропал молча"; fail=1; }
+command rm -rf "$cb" "$eb"
 
 # Каталог: новое имя, историческое, переопределение, INDEX не чеклист.
 tmp=$(mktemp -d)

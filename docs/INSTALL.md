@@ -50,11 +50,13 @@ the files — see below.
 ## Codex
 
 ```
-git clone https://github.com/ZenonEl/kanon.git ~/.codex/plugins/kanon
+codex plugin marketplace add https://github.com/ZenonEl/kanon.git
+codex plugin add kanon --marketplace kanon
 ```
 
-Or point the host at `.agents/plugins/marketplace.json` if it reads
-marketplaces.
+A bare clone into a plugins directory is **not** enough: the host discovers
+plugins through a marketplace, and a copied tree is reported as
+`No marketplace plugins found`. Verified against the current CLI.
 
 Hooks do not run under Codex. The skill works, and `check-checklist.py` and
 `sweep.py` are run by hand or from your own CI.

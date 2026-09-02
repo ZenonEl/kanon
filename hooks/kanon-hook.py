@@ -59,12 +59,25 @@ def _run(script: str, *args: str) -> str:
 
 
 def _checklists() -> list:
+    """Чеклисты каталога. Один битый файл не ослепляет остальные.
+
+    Раньше весь разбор стоял под одним обработчиком: единственный чеклист с
+    битой кодировкой возвращал пустой список, и хук вёл себя так, будто
+    чеклистов нет вовсе — то есть требовал завести новый при живом.
+    """
     sys.path.insert(0, str(SCRIPTS))
     try:
         from kanon_format import find, parse  # noqa: PLC0415
-        return [parse(p) for p in find()]
+        paths, _skipped = find()
     except Exception:  # noqa: BLE001
         return []
+    docs = []
+    for path in paths:
+        try:
+            docs.append(parse(path))
+        except Exception:  # noqa: BLE001
+            continue
+    return docs
 
 
 def _gathering_count(transcript: str | None) -> int:
@@ -84,23 +97,38 @@ def _gathering_count(transcript: str | None) -> int:
                     if f'"name":"{name}"' in line or f'"name": "{name}"' in line:
                         count += 1
                         break
+                if count >= GATHERING_THRESHOLD:
+                    # Ответ уже известен: дочитывать транскрипт до конца при
+                    # каждой записи — линейный ввод-вывод впустую, и на большом
+                    # он упирается в таймаут хука, то есть сенсор молча гаснет.
+                    return count
     except Exception:  # noqa: BLE001
         return 0
     return count
 
 
 def _once_per_session(session_id: str) -> bool:
-    """True, если в этой сессии ещё не говорили."""
+    """True, если в этой сессии ещё не говорили.
+
+    Создание исключительное (O_EXCL) и в приватном подкаталоге: проверка
+    существования отдельно от создания оставляла окно, в котором два
+    параллельных вызова оба считали себя первыми, а предсказуемое имя в общем
+    /tmp позволяло чужому процессу заглушить напоминание, создав файл заранее.
+    """
     if not session_id:
         return True
-    marker = pathlib.Path(tempfile.gettempdir()) / f"kanon-reminded-{session_id[:40]}"
-    if marker.exists():
-        return False
+    safe = "".join(c for c in session_id if c.isalnum() or c in "-_")[:64] or "unknown"
+    folder = pathlib.Path(tempfile.gettempdir()) / f"kanon-{os.getuid()}"
     try:
-        marker.touch()
+        folder.mkdir(mode=0o700, exist_ok=True)
+        fd = os.open(folder / f"reminded-{safe}",
+                     os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        os.close(fd)
+        return True
+    except FileExistsError:
+        return False
     except OSError:
-        pass
-    return True
+        return True  # не смогли отметить — лучше сказать, чем промолчать
 
 
 # --- события / events -----------------------------------------------------
@@ -110,9 +138,13 @@ def _sweep_markers(days: int = 7) -> None:
     """Убрать старые метки «уже говорили»: они лежат в общем /tmp."""
     try:
         cutoff = time.time() - days * 86400
-        for marker in pathlib.Path(tempfile.gettempdir()).glob("kanon-reminded-*"):
-            if marker.stat().st_mtime < cutoff:
-                marker.unlink(missing_ok=True)
+        folder = pathlib.Path(tempfile.gettempdir()) / f"kanon-{os.getuid()}"
+        for marker in folder.glob("reminded-*"):
+            try:
+                if marker.stat().st_mtime < cutoff:
+                    marker.unlink(missing_ok=True)
+            except OSError:
+                continue  # одна неудача не должна прерывать уборку
     except Exception:  # noqa: BLE001
         pass
 
@@ -124,9 +156,14 @@ def on_session_start(_: dict) -> str:
 
 def on_pre_tool_use(payload: dict) -> str:
     target = str(payload.get("tool_input", {}).get("file_path", ""))
-    # Запись самого чеклиста — не производство.
-    if any(f"{os.sep}{d}{os.sep}" in target or target.startswith(d)
-               for d in ("_kanon", ".kanon")):
+    # Запись самого чеклиста — не производство. Имя каталога берём то же, что
+    # видит разбор: иначе KANON_DIR переопределяет его для линтера, но не для
+    # хука, и создание чеклиста вызывает требование создать чеклист.
+    names = {"_kanon", ".kanon"}
+    override = os.environ.get("KANON_DIR")
+    if override:
+        names.add(pathlib.PurePath(override).name)
+    if any(f"{os.sep}{d}{os.sep}" in target or target.startswith(d) for d in names):
         return ""
 
     # Заброшенный чеклист — всё равно чеклист: заводить второй не надо, а про
