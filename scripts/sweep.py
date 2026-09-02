@@ -72,10 +72,16 @@ def main(argv: list[str]) -> int:
     for doc in docs:
         buckets[doc.state].append(doc)
 
-    if "--no-index" not in argv:
-        write_index(docs)
-
     lines: list[str] = []
+    index_failed = ""
+    if "--no-index" not in argv:
+        try:
+            write_index(docs)
+        except OSError as exc:
+            # Отчёт важнее производного файла: раньше падение записи уносило с
+            # собой весь вывод про заброшенное и истёкшее, ради которого команду
+            # и вызывают.
+            index_failed = f"  INDEX.md не записан ({exc.strerror}) / index not written"
 
     # stale — показать, не удалять. Самый важный раздел.
     for doc in buckets["stale"]:
@@ -101,6 +107,9 @@ def main(argv: list[str]) -> int:
             closed = len([i for i in doc.items if i.closed])
             lines.append(f"  в работе  {doc.path.name}  "
                          f"{closed}/{len(doc.items)} закрыто доказательством")
+
+    if index_failed:
+        lines.append(index_failed)
 
     if not lines:
         return 0

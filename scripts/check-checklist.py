@@ -53,6 +53,17 @@ def check(doc: Checklist) -> list[str]:
             f"задача называла количество, недостача не видна / slot count mismatch"
         )
 
+    # Пункт, который не разобрался, — ошибка, а не тишина. Иначе он исчезает
+    # из приёмки, а линтер печатает «ok»: проверка, которая не может покраснеть.
+    for line, raw in doc.malformed:
+        errors.append(f"строка {line}: не разобрано как пункт приёмки — "
+                      f"нужен вид «- [ ] N. текст» / unparsed acceptance line: {raw[:60]!r}")
+
+    if not doc.had_acceptance_section:
+        errors.append("нет раздела Acceptance / Приёмка — приёмке нечего проверять")
+    elif not doc.items:
+        errors.append("раздел Acceptance пуст — приёмке нечего проверять / empty Acceptance")
+
     # Правило 3: отметка без доказательства недействительна.
     for item in doc.ticked_without_proof:
         value = item.fields.get("proof", "")

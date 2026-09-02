@@ -20,6 +20,9 @@ Every token has documented aliases. The linter accepts any of them; new
 translations are added by extending the alias table, never by changing the
 canonical key.
 
+A section heading is matched by **containment**, so bilingual headings such as
+`## Приёмка / Acceptance` are recognised.
+
 | Canonical | Aliases accepted |
 |---|---|
 | `## Gathered` | `## Собрано`, `## Из собранного` |
@@ -166,11 +169,15 @@ about kanon and does not need to. Its absence does not affect anything.
 `scripts/check-checklist.py` verifies form only:
 
 - frontmatter present and parseable, `opened` a valid date;
+- an Acceptance section exists and is not empty;
+- every line in it that begins with `- [` parses as an item — a line that looks
+  like an item but does not parse is an error, never a silent skip;
 - `slots:` present when the task names a quantity, and matching the number of
   acceptance lines;
 - no `[x]` without `proof:`;
 - `proof:` not in the stop list of empty affirmations, in any supported
-  language;
+  language. **The stop list is the only criterion** — there is no minimum
+  length: `h.png` and `#482` are valid proofs;
 - failure entries reference existing item numbers;
 - Gathered is not empty.
 

@@ -101,8 +101,8 @@ against.
 Read the proof line with a stranger's eyes. `commit a1b2c3d + out/screens/07.png`
 is proof. `done` is its absence.
 
-`scripts/check-checklist.py` refuses the laziest cases mechanically, in any
-supported language. It sees non-emptiness only — judging whether a proof is real
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check-checklist.py"` refuses the laziest
+cases mechanically, in any supported language. It sees non-emptiness only — judging whether a proof is real
 stays with the reader.
 
 ## If an item fails
@@ -152,7 +152,7 @@ does not.**
 |---|---|
 | open | never expires |
 | closed | 7 days, then dropped |
-| stale (14 days idle, items still open) | **surfaced, never dropped** |
+| stale (not closed, 14 days idle) | **surfaced, never dropped** |
 
 Dropping an unclosed checklist silently erases the very shortfall it exists to
 show.
@@ -165,7 +165,7 @@ became a document).
 never moved anywhere, which means the work is not closed. That is a reason to
 ask why, not to extend the deadline.
 
-`scripts/sweep.py` computes this. Dates worked out in passing are worked out
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/sweep.py"` computes this. Dates worked out in passing are worked out
 wrong.
 
 ## Boundary with planning

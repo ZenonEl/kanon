@@ -30,6 +30,7 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+import time
 
 GATHERING_TOOLS = {"Read", "Grep", "Glob", "WebSearch", "WebFetch", "NotebookRead"}
 GATHERING_THRESHOLD = 3
@@ -95,7 +96,19 @@ def _once_per_session(session_id: str) -> bool:
 # --- события / events -----------------------------------------------------
 
 
+def _sweep_markers(days: int = 7) -> None:
+    """Убрать старые метки «уже говорили»: они лежат в общем /tmp."""
+    try:
+        cutoff = time.time() - days * 86400
+        for marker in pathlib.Path(tempfile.gettempdir()).glob("kanon-reminded-*"):
+            if marker.stat().st_mtime < cutoff:
+                marker.unlink(missing_ok=True)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def on_session_start(_: dict) -> str:
+    _sweep_markers()
     return _run("sweep.py", "--quiet")
 
 

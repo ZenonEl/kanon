@@ -18,7 +18,10 @@ Three questions, each producing lines in the file:
 A number in the task goes into `slots:` and becomes that many lines. Do not
 start producing before the file exists.
 
-Then run `python3 scripts/check-checklist.py` (or the plugin's copy) to confirm
-the file is well formed.
+Then confirm the file is well formed:
+
+```
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check-checklist.py"
+```
 
 $ARGUMENTS

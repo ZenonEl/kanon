@@ -54,7 +54,9 @@ EMPTY_PROOF = {
     "done", "ok", "okay", "works", "working", "checked", "fixed", "yes", "good",
     "готово", "сделано", "работает", "проверил", "проверено", "исправлено", "да",
 }
-MIN_PROOF_LEN = 6
+# Порога длины здесь НЕТ намеренно. Он был и отвергал «h.png» и «#482» —
+# путь к скриншоту и ссылку на задачу, которые спека перечисляет как валидные
+# доказательства. Спека — источник истины, критерий в ней один: стоп-лист.
 
 _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 _HEADING = re.compile(r"^##\s+(.+?)\s*$")
@@ -63,7 +65,25 @@ _FAILURE = re.compile(r"^\[!\]\s*(\d+)\s*·?\s*(.*)$")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 _FIELD_LOOKUP = {a: key for key, aliases in FIELD_ALIASES.items() for a in aliases}
-_SECTION_LOOKUP = {a: key for key, aliases in SECTIONS.items() for a in aliases}
+
+
+def _section_of(heading: str) -> str:
+    """Какой раздел назван заголовком.
+
+    По вхождению, а не по равенству: двуязычные заголовки вида
+    «## Приёмка / Acceptance» естественны в этом репозитории, а точное сравнение
+    их не узнавало — и весь блок пунктов молча выпадал из разбора.
+    Побеждает псевдоним, встретившийся раньше: заголовок разбирается
+    детерминированно.
+    """
+    low = heading.strip().lower()
+    best, at = "", len(low) + 1
+    for key, aliases in SECTIONS.items():
+        for alias in aliases:
+            pos = low.find(alias)
+            if pos != -1 and pos < at:
+                best, at = key, pos
+    return best
 
 
 @dataclass
@@ -81,7 +101,7 @@ class Item:
         if not value:
             return False
         bare = value.strip(" .!·").lower()
-        return bare not in EMPTY_PROOF and len(bare) >= MIN_PROOF_LEN
+        return bare not in EMPTY_PROOF
 
     @property
     def empty_slot(self) -> bool:
@@ -100,6 +120,8 @@ class Checklist:
     items: list[Item] = field(default_factory=list)
     failures: list[tuple[int, str]] = field(default_factory=list)
     had_gathered_section: bool = False
+    had_acceptance_section: bool = False
+    malformed: list[tuple[int, str]] = field(default_factory=list)
 
     # --- выведенное состояние / derived state ---
 
@@ -113,8 +135,12 @@ class Checklist:
         if self.closed_on:
             return "closed"
         try:
+            # Условия ровно два, как в спеке. Третьего («есть открытые пункты»)
+            # тут стояло, и из-за него чеклист, где всё доказано, а `closed:` не
+            # проставлен, никогда не всплывал — то есть ровно тот случай, когда
+            # доказательства никуда не переехали, а тара не закрыта.
             age = _dt.date.today() - _dt.date.fromtimestamp(self.path.stat().st_mtime)
-            if age.days >= 14 and self.open_items:
+            if age.days >= 14:
                 return "stale"
         except OSError:
             pass
@@ -146,23 +172,38 @@ class Checklist:
 
 
 def _split_fields(tail: str) -> tuple[str, dict[str, str], bool]:
-    """Разобрать хвост строки пункта на текст, поля и метку «без проверки»."""
+    """Разобрать хвост строки пункта на текст, поля и метку «без проверки».
+
+    Сегмент без ключа НЕ отбрасывается, а приклеивается обратно к предыдущему
+    полю (или к тексту). Иначе точка внутри доказательства обрезала бы его
+    молча — а обрезанное доказательство линтер объявлял бы отсутствующим.
+
+    Метка «без проверки» опознаётся только как отдельный сегмент: иначе пункт
+    «описать соглашение [no check]» объявлялся бы непроверяемым.
+    """
+    segments = [s.strip() for s in tail.split("·")]
     no_check = False
-    for marker in NO_CHECK:
-        if marker in tail.lower():
+    kept: list[str] = []
+    for segment in segments:
+        if segment.lower() in NO_CHECK:
             no_check = True
-            tail = re.sub(re.escape(marker), "", tail, flags=re.I)
-    parts = [p.strip() for p in tail.split("·")]
-    text = parts[0] if parts else ""
-    fields: dict[str, str] = {}
-    for part in parts[1:]:
-        key, sep, value = part.partition(":")
-        if not sep:
             continue
-        canonical = _FIELD_LOOKUP.get(key.strip().lower())
+        kept.append(segment)
+
+    text = kept[0].strip("*").strip() if kept else ""
+    fields: dict[str, str] = {}
+    last: str | None = None
+    for part in kept[1:]:
+        key, sep, value = part.partition(":")
+        canonical = _FIELD_LOOKUP.get(key.strip().lower()) if sep else None
         if canonical:
             fields[canonical] = value.strip().strip("*")
-    return text.strip("*").strip(), fields, no_check
+            last = canonical
+        elif last:
+            fields[last] = f"{fields[last]} · {part}".strip()
+        else:
+            text = f"{text} · {part}".strip() if text else part
+    return text, fields, no_check
 
 
 def parse(path: pathlib.Path) -> Checklist:
@@ -184,9 +225,11 @@ def parse(path: pathlib.Path) -> Checklist:
     for n, raw in enumerate(text.splitlines(), start=offset + 1):
         heading = _HEADING.match(raw)
         if heading:
-            section = _SECTION_LOOKUP.get(heading.group(1).strip().lower(), "")
+            section = _section_of(heading.group(1))
             if section == "gathered":
                 doc.had_gathered_section = True
+            elif section == "acceptance":
+                doc.had_acceptance_section = True
             continue
 
         if section == "gathered" and raw.strip().startswith("-"):
@@ -194,7 +237,12 @@ def parse(path: pathlib.Path) -> Checklist:
             continue
 
         if section == "acceptance":
-            item = _ITEM.match(raw.strip())
+            stripped = raw.strip()
+            item = _ITEM.match(stripped)
+            if not item and stripped.startswith("- ["):
+                # Строка выглядит пунктом, но не разобралась. Молча пропустить
+                # её нельзя: пункт исчезнет из приёмки, а линтер напечатает «ok».
+                doc.malformed.append((n, stripped))
             if item:
                 body, fields, no_check = _split_fields(item.group(3))
                 doc.items.append(Item(

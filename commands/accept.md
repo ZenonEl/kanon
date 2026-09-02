@@ -19,7 +19,13 @@ report from "confirmed: done" is a person's job.
 "Done" is only said when the first number equals the total. Otherwise list the
 shortfall.
 
-Start with `python3 scripts/check-checklist.py` — it refuses ticks without proof
-and slot counts that do not match.
+Start with:
+
+```
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check-checklist.py"
+```
+
+It refuses ticks without proof, slot counts that do not match, and lines that do
+not parse as acceptance items.
 
 $ARGUMENTS
