@@ -116,8 +116,8 @@ against.
 Read the proof line with a stranger's eyes. `commit a1b2c3d + out/screens/07.png`
 is proof. `done` is its absence.
 
-`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check-checklist.py"` refuses the laziest
-cases mechanically, in any supported language. It sees non-emptiness only — judging whether a proof is real
+The linter refuses the laziest cases mechanically, in any supported language —
+see [Running the scripts](#running-the-scripts) below. It sees non-emptiness only — judging whether a proof is real
 stays with the reader.
 
 ## If an item fails
@@ -180,8 +180,26 @@ became a document).
 never moved anywhere, which means the work is not closed. That is a reason to
 ask why, not to extend the deadline.
 
-`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/sweep.py"` computes this. Dates worked out in passing are worked out
-wrong.
+`sweep.py` computes this — see [Running the scripts](#running-the-scripts).
+Dates worked out in passing are worked out wrong.
+
+## Running the scripts
+
+Two scripts back the rules above: `check-checklist.py` (refuses a tick without
+proof, a slot count that does not match, a line that does not parse) and
+`sweep.py` (derives lifetime, rebuilds the index).
+
+They live in `scripts/` **inside the plugin**, not in the user's project, so the
+path depends on the host:
+
+- **Claude Code** — the plugin root is in `${CLAUDE_PLUGIN_ROOT}`:
+  `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check-checklist.py"`
+- **Codex and anything else** — that variable does not exist. Use the path where
+  the plugin was installed, e.g. `python3 ~/.codex/plugins/kanon/scripts/check-checklist.py`.
+
+Resolve the path once at the start of the work and reuse it. If neither form
+resolves, say so plainly and continue without the machine check rather than
+inventing a path — an unrun check reported as run is worse than an admitted gap.
 
 ## Boundary with planning
 

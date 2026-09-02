@@ -24,12 +24,12 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from kanon_format import _DATE, Checklist, find, parse  # noqa: E402
 
 
-def check(doc: Checklist) -> list[str]:
+def check(doc: Checklist) -> list[tuple[str, str]]:
     errors: list[str] = []
     warn: list[str] = []
 
     if not doc.meta:
-        return [f"{doc.path}: нет frontmatter / no frontmatter"]
+        return [("error", "нет frontmatter / no frontmatter")]
 
     if not doc.meta.get("task"):
         errors.append("нет поля task / missing task")
@@ -93,8 +93,11 @@ def check(doc: Checklist) -> list[str]:
             note += " — больше половины результата ни на чём не держится"
         warn.append(note)
 
-    return [f"{doc.path}: {e}" for e in errors] + \
-           [f"{doc.path}: (!) {w}" for w in warn if not errors]
+    # Пара (уровень, текст), а не подстрока «(!)» в готовой строке: в текст
+    # ошибки подставляется пользовательский ввод, и пункт вида «- [ ] (!) 2. …»
+    # печатал ошибку с кодом возврата 0 — а код возврата смотрит CI.
+    return ([("error", e) for e in errors]
+            + ([("warn", w) for w in warn] if not errors else []))
 
 
 def main(argv: list[str]) -> int:
@@ -115,12 +118,12 @@ def main(argv: list[str]) -> int:
             continue
         doc = parse(path)
         problems = check(doc)
-        hard = [p for p in problems if "(!)" not in p]
-        if hard:
+        if any(level == "error" for level, _ in problems):
             failed = True
         if problems:
-            for p in problems:
-                print(f"  {p}")
+            for level, message in problems:
+                mark = "" if level == "error" else "(!) "
+                print(f"  {path}: {mark}{message}")
         elif not quiet:
             print(f"  {path}: ok · {len([i for i in doc.items if i.closed])}"
                   f"/{len(doc.items)} закрыто доказательством · {doc.state}")

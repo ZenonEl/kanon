@@ -3,7 +3,12 @@
 # языках и отказывать на дефектном. Тест на мутацию: снимаешь защиту — краснеет.
 set -u
 cd "$(dirname "$0")/.."
+here_root=$(pwd)
 fail=0
+
+# Разбор против спеки. Отдельным файлом, потому что здесь проверяются значения,
+# а не коды возврата: пять правок держались проверками, смотревшими только rc.
+python3 tests/test_parser.py || fail=1
 
 for f in tests/fixtures/good-en.md tests/fixtures/good-ru.md; do
   if python3 scripts/check-checklist.py "$f" >/dev/null 2>&1; then
@@ -125,6 +130,24 @@ python3 scripts/check-checklist.py "$mb/noacc.md" >/dev/null 2>&1 \
   && { echo "ОШИБКА чеклист без приёмки принят"; fail=1; } \
   || echo "ok    чеклист без раздела приёмки отвергнут"
 
+# Раздел есть, но пуст — отдельный случай: он проходил, пока проверялось только
+# отсутствие раздела.
+cat > "$mb/emptyacc.md" <<'EMPTYACC'
+---
+task: t
+opened: 2026-09-02
+closed: null
+slots: null
+source: -
+---
+## Gathered
+- x · y
+## Acceptance
+EMPTYACC
+python3 scripts/check-checklist.py "$mb/emptyacc.md" >/dev/null 2>&1 \
+  && { echo "ОШИБКА пустой раздел приёмки принят"; fail=1; } \
+  || echo "ok    пустой раздел приёмки отвергнут"
+
 # Доказательство-путь и доказательство с точкой внутри обязаны приниматься.
 cat > "$mb/proofs.md" <<'PROOFS'
 ---
@@ -144,6 +167,76 @@ python3 scripts/check-checklist.py "$mb/proofs.md" >/dev/null 2>&1 \
   && echo "ok    путь и доказательство с точкой приняты" \
   || { echo "ОШИБКА валидное доказательство отвергнуто:"; python3 scripts/check-checklist.py "$mb/proofs.md"; fail=1; }
 command rm -rf "$mb"
+
+# Ошибка обязана давать код возврата 1, даже если её текст содержит «(!)»:
+# в текст подставляется пользовательский ввод, а rc смотрит CI.
+sb=$(mktemp -d)
+cat > "$sb/sev.md" <<'SEV'
+---
+task: t
+opened: 2026-09-02
+closed: null
+slots: null
+source: -
+---
+## Gathered
+- x · y
+## Acceptance
+- [x] 1. ok · check: c · proof: коммит a1b2c3d
+- [ ] (!) 2. срочный · check: c
+SEV
+python3 scripts/check-checklist.py "$sb/sev.md" >/dev/null 2>&1 \
+  && { echo "ОШИБКА пункт с (!) дал код 0 при напечатанной ошибке"; fail=1; } \
+  || echo "ok    ошибка с «(!)» в тексте даёт код возврата 1"
+command rm -rf "$sb"
+
+# sweep обязан напечатать отчёт, даже если INDEX.md не записывается.
+wb=$(mktemp -d); mkdir -p "$wb/_kanon"
+cat > "$wb/_kanon/s.md" <<'STALE'
+---
+task: заброшенный
+opened: 2026-08-01
+closed: null
+slots: null
+source: -
+---
+## Gathered
+- x · y
+## Acceptance
+- [ ] 1. так и не собрал · check: тест
+STALE
+touch -d "30 days ago" "$wb/_kanon/s.md"
+chmod a-w "$wb/_kanon"
+out=$( cd "$wb" && python3 "$(pwd -P >/dev/null; echo "$here_root")/scripts/sweep.py" 2>&1 || true )
+chmod u+w "$wb/_kanon"
+echo "$out" | grep -q 'STALE\|ЗАБРОШЕН' \
+  && echo "ok    sweep печатает отчёт при незаписываемом INDEX.md" \
+  || { echo "ОШИБКА sweep потерял отчёт:"; echo "$out"; fail=1; }
+command rm -rf "$wb"
+
+# PreToolUse не должен требовать новый чеклист при живом заброшенном.
+nb=$(mktemp -d); mkdir -p "$nb/_kanon"; tr2="$nb/tr.jsonl"
+cat > "$nb/_kanon/s.md" <<'NAG'
+---
+task: всё доказано, closed не проставлен
+opened: 2026-08-01
+closed: null
+slots: null
+source: -
+---
+## Gathered
+- x · y
+## Acceptance
+- [x] 1. r · check: c · proof: коммит a1b2c3d
+NAG
+touch -d "28 days ago" "$nb/_kanon/s.md"
+for i in 1 2 3 4; do echo '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read"}]}}'; done > "$tr2"
+sid2="selftest-nag-$$"
+pay2="{\"session_id\":\"$sid2\",\"transcript_path\":\"$tr2\",\"tool_input\":{\"file_path\":\"$nb/src/a.py\"}}"
+nag=$( cd "$nb" && echo "$pay2" | python3 "$here_root/hooks/kanon-hook.py" PreToolUse )
+[ -z "$nag" ] && echo "ok    PreToolUse молчит при живом заброшенном чеклисте" \
+  || { echo "ОШИБКА PreToolUse требует чеклист, хотя он есть"; fail=1; }
+command rm -rf "$nb" "/tmp/kanon-reminded-$sid2"
 
 # Каталог: новое имя, историческое, переопределение, INDEX не чеклист.
 tmp=$(mktemp -d)

@@ -54,6 +54,10 @@ git clone https://github.com/ZenonEl/kanon.git ~/.codex/plugins/kanon
 Проверка та же: в свежей сессии произнести фразу из триггеров и убедиться, что
 скил поднялся.
 
+Хуки под Codex не работают. `${CLAUDE_PLUGIN_ROOT}` — переменная Claude Code и
+здесь **не задана**: скрипты вызываются по пути, куда склонирован плагин,
+например `python3 ~/.codex/plugins/kanon/scripts/check-checklist.py`.
+
 ## Если скил не срабатывает
 
 Порядок диагностики — от самого частого к самому редкому:

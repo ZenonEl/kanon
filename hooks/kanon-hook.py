@@ -119,8 +119,11 @@ def on_pre_tool_use(payload: dict) -> str:
                for d in ("_kanon", ".kanon")):
         return ""
 
-    docs = [d for d in _checklists() if d.state == "open"]
-    if docs:
+    # Заброшенный чеклист — всё равно чеклист: заводить второй не надо, а про
+    # заброшенность скажет SessionStart. Раньше глушилка смотрела только на
+    # "open", и файл, где всё доказано, а closed не проставлен, вызывал
+    # требование завести новый.
+    if [d for d in _checklists() if d.state in ("open", "stale")]:
         return ""
 
     if _gathering_count(payload.get("transcript_path")) < GATHERING_THRESHOLD:

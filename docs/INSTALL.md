@@ -59,6 +59,10 @@ marketplaces.
 Hooks do not run under Codex. The skill works, and `check-checklist.py` and
 `sweep.py` are run by hand or from your own CI.
 
+`${CLAUDE_PLUGIN_ROOT}` is a Claude Code variable and is **not** set here: under
+Codex, call the scripts by the path where you cloned the plugin, for example
+`python3 ~/.codex/plugins/kanon/scripts/check-checklist.py`.
+
 ## What the hooks do
 
 Shipped in `hooks/hooks.json` and active in Claude Code only. **None of them
