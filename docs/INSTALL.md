@@ -10,7 +10,7 @@ worth knowing before you install.
 | Entry points | skills **and** slash commands | **skills only** |
 | Manifest | `.claude-plugin/plugin.json` | `.codex-plugin/plugin.json` |
 | Marketplace | `.claude-plugin/marketplace.json` | `.agents/plugins/marketplace.json` |
-| Hooks | shipped by the plugin | not available |
+| Hooks | shipped by the plugin | same file, since Codex 0.149 — after trust review in `/hooks` |
 
 Codex has no slash commands as a class. All of kanon's work is therefore
 reachable through the `task-to-checklist` skill; the `/kanon:*` commands are
@@ -58,12 +58,18 @@ A bare clone into a plugins directory is **not** enough: the host discovers
 plugins through a marketplace, and a copied tree is reported as
 `No marketplace plugins found`. Verified against the current CLI.
 
-Hooks do not run under Codex. The skill works, and `check-checklist.py` and
-`sweep.py` are run by hand or from your own CI.
+**Hooks run under Codex too** (measured live on 0.149.0, 2026-09-03). Codex
+reads the same `hooks/hooks.json`, speaks the same wire — `tool_name` is `Bash`
+for shell and `apply_patch` for edits, with the patch text in
+`tool_input.command` — substitutes `${CLAUDE_PLUGIN_ROOT}` in hook commands and
+shows `systemMessage`. What differs: every hook must be **trusted once** in
+`/hooks` before it runs, and `transcript_path` is either empty or a rollout in
+Codex's own format, so kanon counts gathering by its own tally of the `Bash`
+calls that pass through the hook rather than by the transcript.
 
-`${CLAUDE_PLUGIN_ROOT}` is a Claude Code variable and is **not** set here: under
-Codex, call the scripts by the path where you cloned the plugin, for example
-`python3 ~/.codex/plugins/kanon/scripts/check-checklist.py`.
+`${CLAUDE_PLUGIN_ROOT}` is set for hook commands only. In the skill body, under
+Codex, call the scripts by the plugin cache path:
+`~/.codex/plugins/cache/<marketplace>/<plugin>/<version>/scripts/check-checklist.py`.
 
 ## What the hooks do
 

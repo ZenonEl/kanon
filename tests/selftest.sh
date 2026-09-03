@@ -490,6 +490,26 @@ m=$(printf '{"session_id":"bash-m-%s","transcript_path":"%s","tool_name":"Bash",
   || { echo "ОШИБКА sed -i засчитан как сбор"; fail=1; }
 command rm -rf "$bb"
 
+# Codex: transcript_path пуст, tool_name Bash/apply_patch. Сбор считается
+# собственной зарубкой по вызовам, прошедшим через хук.
+cb2=$(mktemp -d); mkdir -p "$cb2/src"
+csay () { printf '{"session_id":"%s","transcript_path":null,"tool_name":"%s","tool_input":{"command":"%s"}}' "$1" "$2" "$3" \
+  | ( cd "$cb2" && python3 "$here_root/hooks/kanon-hook.py" PreToolUse ); }
+cs="codex-$$"
+early=$(csay "$cs" Bash "cat src/a.py"); csay "$cs" Bash "sed -n 1,9p src/b.py" >/dev/null
+[ -z "$early" ] && echo "ok    без транскрипта два чтения — ещё тишина" \
+  || { echo "ОШИБКА напомнил раньше порога без транскрипта"; fail=1; }
+csay "$cs" Bash "git log --oneline -3" >/dev/null
+cw=$(csay "$cs" apply_patch "*** Begin Patch\n*** Add File: src/c.txt\n+hello\n*** End Patch")
+[ -n "$cw" ] && echo "ok    Codex: три чтения через Bash и apply_patch — напоминание без транскрипта" \
+  || { echo "ОШИБКА Codex-путь: сбор не досчитан или apply_patch не опознан"; fail=1; }
+cs2="codex-k-$$"
+for i in 1 2 3; do csay "$cs2" Bash "cat src/a.py" >/dev/null; done
+ck=$(csay "$cs2" apply_patch "*** Begin Patch\n*** Add File: _kanon/2026-09-03-x.md\n+---\n*** End Patch")
+[ -z "$ck" ] && echo "ok    apply_patch в _kanon/ — запись чеклиста, не производство" \
+  || { echo "ОШИБКА apply_patch в _kanon/ принят за производство"; fail=1; }
+command rm -rf "$cb2" "${TMPDIR:-/tmp}/kanon-$(id -u)"
+
 # Разные идентификаторы сессий не должны делить один маркер.
 mk=$(mktemp -d); tr3="$mk/tr.jsonl"
 for i in 1 2 3 4; do echo '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read"}]}}'; done > "$tr3"

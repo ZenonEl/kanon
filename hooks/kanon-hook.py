@@ -37,6 +37,15 @@ Bash — тоже сбор и тоже запись. Первый же пром�
 производство. Ошибка классификации стоит одного лишнего напоминания, и оно
 всё равно одно за сессию.
 
+Codex (проверено живым замером на 0.149.0, 2026-09-03) гоняет хуки плагина по
+тому же проводу, что Claude Code: те же имена событий, `tool_name` для shell —
+`Bash`, для правок — `apply_patch` с текстом патча в `tool_input.command`,
+`CLAUDE_PLUGIN_ROOT` подставляется, `systemMessage` показывается. Но
+`transcript_path` там либо пуст, либо ведёт на rollout другого формата, и
+счётчик сбора по транскрипту у Codex слеп. Поэтому сбор считается ещё и
+собственной зарубкой: каждый собирающий вызов Bash, прошедший через этот хук,
+прибавляет единицу в файл сессии, а порог сравнивается с большим из двух чисел.
+
 Hooks fire on events, not on phrasing: they cover the gap where the move from
 gathering to producing is never announced in words. Nothing blocks, nothing
 raises, and the pre-write reminder speaks once per session.
@@ -176,6 +185,40 @@ def _gathering_count(transcript: str | None) -> int:
     return count
 
 
+def _session_folder() -> pathlib.Path:
+    return pathlib.Path(tempfile.gettempdir()) / f"kanon-{os.getuid()}"
+
+
+def _session_key(session_id: str) -> str:
+    # Хеш, а не вычистка символов: канонизация склеивала разные идентификаторы
+    # в одно имя («review-a/b» и «review-ab»), и вторая сессия молча теряла своё
+    # единственное напоминание.
+    return hashlib.sha256(session_id.encode("utf-8", "replace")).hexdigest()[:32]
+
+
+def _tally_gathering(session_id: str, add: int) -> int:
+    """Собственный счёт сбора: сколько собирающих вызовов прошло через хук.
+
+    Нужен там, где транскрипт недоступен или чужого формата (Codex). Считает
+    только то, что хук видел сам, то есть Bash; Read/Grep/Glob под матчер не
+    попадают и остаются на транскрипте. Итог — максимум из двух счётчиков.
+    """
+    if not session_id:
+        return 0
+    folder = _session_folder()
+    path = folder / f"gather-{_session_key(session_id)}"
+    try:
+        folder.mkdir(mode=0o700, exist_ok=True)
+        # Сохраняем размер, а не число: одна запись = один байт, без чтения и
+        # без гонки между параллельными вызовами.
+        if add:
+            with open(path, "ab", 0) as fh:
+                fh.write(b"." * add)
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
 def _once_per_session(session_id: str) -> bool:
     """True, если в этой сессии ещё не говорили.
 
@@ -186,11 +229,8 @@ def _once_per_session(session_id: str) -> bool:
     """
     if not session_id:
         return True
-    # Хеш, а не вычистка символов: канонизация склеивала разные идентификаторы
-    # в одно имя («review-a/b» и «review-ab»), и вторая сессия молча теряла своё
-    # единственное напоминание.
-    safe = hashlib.sha256(session_id.encode("utf-8", "replace")).hexdigest()[:32]
-    folder = pathlib.Path(tempfile.gettempdir()) / f"kanon-{os.getuid()}"
+    safe = _session_key(session_id)
+    folder = _session_folder()
     try:
         folder.mkdir(mode=0o700, exist_ok=True)
         fd = os.open(folder / f"reminded-{safe}",
@@ -211,7 +251,7 @@ def _sweep_markers(days: int = 7) -> None:
     try:
         cutoff = time.time() - days * 86400
         folder = pathlib.Path(tempfile.gettempdir()) / f"kanon-{os.getuid()}"
-        for marker in folder.glob("reminded-*"):
+        for marker in (*folder.glob("reminded-*"), *folder.glob("gather-*")):
             try:
                 if marker.stat().st_mtime < cutoff:
                     marker.unlink(missing_ok=True)
@@ -226,26 +266,44 @@ def on_session_start(_: dict) -> str:
     return _run("sweep.py", "--quiet")
 
 
+PATCH_PATH = re.compile(r"^\*\*\* (?:Add|Update|Delete|Move to) File: (.+)$", re.M)
+
+
+def _in_kanon_dir(path: str, names: set) -> bool:
+    return any(f"{os.sep}{d}{os.sep}" in path or path.startswith(f"{d}{os.sep}")
+               or path == d for d in names)
+
+
 def on_pre_tool_use(payload: dict) -> str:
     tool_input = payload.get("tool_input", {})
-    if payload.get("tool_name") == "Bash":
-        # Запись через shell: heredoc в файл, sed -i, tee. Команда, которая
-        # только читает, производством не является — и не напоминает.
-        target = str(tool_input.get("command", ""))
-        if not bash_writes(target):
-            return ""
-    else:
-        target = str(tool_input.get("file_path", ""))
-    # Запись самого чеклиста — не производство. Имя каталога берём то же, что
-    # видит разбор: иначе KANON_DIR переопределяет его для линтера, но не для
-    # хука, и создание чеклиста вызывает требование создать чеклист.
+    tool_name = payload.get("tool_name")
+    session_id = str(payload.get("session_id", ""))
     names = {"_kanon", ".kanon"}
     override = os.environ.get("KANON_DIR")
     if override:
         names.add(pathlib.PurePath(override).name)
-    if any(f"{os.sep}{d}{os.sep}" in target or target.startswith(d) for d in names):
-        return ""
 
+    if tool_name == "Bash":
+        # Запись через shell: heredoc в файл, sed -i, tee. Команда, которая
+        # только читает, производством не является — она сбор, и её считаем.
+        command = str(tool_input.get("command", ""))
+        if bash_gathers(command):
+            _tally_gathering(session_id, 1)
+            return ""
+        if not bash_writes(command):
+            return ""
+        targets = [command]
+    elif tool_name == "apply_patch":
+        # Codex: патч целиком в tool_input.command, пути — в его заголовках.
+        targets = PATCH_PATH.findall(str(tool_input.get("command", ""))) or [""]
+    else:
+        targets = [str(tool_input.get("file_path", ""))]
+
+    # Запись самого чеклиста — не производство. Имя каталога берём то же, что
+    # видит разбор: иначе KANON_DIR переопределяет его для линтера, но не для
+    # хука, и создание чеклиста вызывает требование создать чеклист.
+    if targets and all(_in_kanon_dir(t, names) for t in targets):
+        return ""
     # Заброшенный чеклист — всё равно чеклист: заводить второй не надо, а про
     # заброшенность скажет SessionStart. Раньше глушилка смотрела только на
     # "open", и файл, где всё доказано, а closed не проставлен, вызывал
@@ -253,10 +311,12 @@ def on_pre_tool_use(payload: dict) -> str:
     if [d for d in _checklists() if d.state in ("open", "stale")]:
         return ""
 
-    if _gathering_count(payload.get("transcript_path")) < GATHERING_THRESHOLD:
+    gathered = max(_gathering_count(payload.get("transcript_path")),
+                   _tally_gathering(session_id, 0))
+    if gathered < GATHERING_THRESHOLD:
         return ""
 
-    if not _once_per_session(str(payload.get("session_id", ""))):
+    if not _once_per_session(session_id):
         return ""
 
     return (

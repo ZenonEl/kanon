@@ -216,8 +216,10 @@ path depends on the host:
 
 - **Claude Code** — the plugin root is in `${CLAUDE_PLUGIN_ROOT}`:
   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check-checklist.py"`
-- **Codex and anything else** — that variable does not exist. Use the path where
-  the plugin was installed, e.g. `python3 ~/.codex/plugins/kanon/scripts/check-checklist.py`.
+- **Codex and anything else** — that variable is not set in your shell. Use the
+  plugin cache path, e.g.
+  `python3 ~/.codex/plugins/cache/kanon/kanon/<version>/scripts/check-checklist.py`
+  (`ls ~/.codex/plugins/cache/kanon/kanon/` shows the version).
 
 Resolve the path once at the start of the work and reuse it. If neither form
 resolves, say so plainly and continue without the machine check rather than

@@ -224,6 +224,14 @@ is now classified by what the command does — a reading head is gathering, a
 redirect into a file is production — because the event the sensor wants is
 "a file is being written", not "a tool named Write is being called".
 
+A sixth, from the same day: **the hooks run under Codex as well.** The docs
+here said the opposite until a `Stop` message arrived from a Codex session. A
+live probe showed Codex speaking Claude Code's hook wire — same events, same
+`systemMessage`, `${CLAUDE_PLUGIN_ROOT}` substituted — with two differences
+that matter: hooks need a one-time trust review, and the transcript is either
+absent or in Codex's own format. The gathering sensor now keeps its own tally
+of the shell reads it sees, and takes the larger of the two counts.
+
 And a fourth, learned the hard way: **a hook has to speak in the form the host
 listens to.** Plain stdout reaches the transcript only for a few event types;
 elsewhere it goes to a debug log. Two of these three hooks printed text nobody
