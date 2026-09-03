@@ -73,8 +73,12 @@ block anything** — they only speak.
 | Event | When it speaks |
 |---|---|
 | `SessionStart` | a checklist is stale, or a closed one has expired |
-| `PreToolUse` on a write | gathering happened, no checklist exists, production started — **once per session** |
+| `PreToolUse` on a write | gathering happened, no checklist exists, production started — **once per session**. A write is `Write`/`Edit`, or a `Bash` command that redirects into a file, uses `tee` or `sed -i`; gathering is `Read`/`Grep`/`Glob`, or a `Bash` command whose head is a reader (`cat`, `sed -n`, `git log`…) |
 | `Stop` | open items remain; lists them |
+
+Bash is classified by content because a session in bypass mode is told by the
+host to read and write through the shell, and a sensor counting only tool names
+is blind there by construction. A misclassification costs one extra reminder.
 
 The pre-write reminder deliberately stays silent when: an open checklist already
 exists, the write targets `_kanon/` itself, fewer than three gathering

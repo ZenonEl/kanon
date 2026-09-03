@@ -58,8 +58,9 @@ _kanon/
 └── <YYYY-MM-DD>-<slug>.md    one checklist per task
 ```
 
-`_kanon/` sits in the working project root and goes into its `.gitignore`. A
-checklist is not committed: it is scaffolding, not a result. Anything that must
+`_kanon/` sits in the working project root and goes into its `.gitignore` — or,
+in a repository that is not yours to commit to, into `.git/info/exclude`, which
+also covers every worktree of it. A checklist is not committed: it is scaffolding, not a result. Anything that must
 outlive the work has to live elsewhere by the time the file expires.
 
 The directory is **visible, not hidden**: a tool that hides its own files hides

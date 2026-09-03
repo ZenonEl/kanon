@@ -459,6 +459,37 @@ cp tests/fixtures/good-ru.md "$tb/_kanon/live.md"
   && echo "ok    гигантское число — дефект формы, а не нечитаемый файл" \
   || { echo "ОШИБКА гигантское число не опознано как дефект формы"; fail=1; }
 
+# Bash — тоже сбор и тоже запись. Первый промах обкатки: сессия читала через
+# cat и писала через heredoc, и хук, считавший только Read/Write, молчал.
+bb=$(mktemp -d); tr4="$bb/tr.jsonl"
+for c in 'cat src/a.py' 'sed -n 1,40p src/b.py' 'git log --oneline -5' 'grep -rn foo src'; do
+  printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"%s"}}]}}\n' "$c"
+done > "$tr4"
+bsay () { printf '{"session_id":"%s","transcript_path":"%s","tool_name":"Bash","tool_input":{"command":"%s"}}' "$1" "$tr4" "$2" \
+  | ( cd "$bb" && python3 "$here_root/hooks/kanon-hook.py" PreToolUse ); }
+w=$(bsay "bash-w-$$" "cat > $bb/src/a.py <<EOF")
+[ -n "$w" ] && echo "ok    сбор через Bash и запись heredoc-ом опознаны" \
+  || { echo "ОШИБКА хук слеп к сбору и записи через Bash"; fail=1; }
+r=$(bsay "bash-r-$$" "ls -la $bb/src")
+[ -z "$r" ] && echo "ok    читающая команда Bash производством не считается" \
+  || { echo "ОШИБКА хук напомнил на ls"; fail=1; }
+k=$(bsay "bash-k-$$" "cat > $bb/_kanon/2026-09-03-x.md <<EOF")
+[ -z "$k" ] && echo "ok    запись самого чеклиста через Bash не считается производством" \
+  || { echo "ОШИБКА хук требует чеклист при записи чеклиста"; fail=1; }
+n=$(bsay "bash-n-$$" "python3 t.py >/dev/null 2>&1")
+[ -z "$n" ] && echo "ok    перенаправление в /dev/null записью не считается" \
+  || { echo "ОШИБКА /dev/null принят за запись"; fail=1; }
+# Только читающие команды в транскрипте не дотягивают до порога, если среди них записи.
+tr5="$bb/tr5.jsonl"
+for c in 'sed -i s/a/b/ x.py' 'cat > y.py <<EOF' 'ls'; do
+  printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"%s"}}]}}\n' "$c"
+done > "$tr5"
+m=$(printf '{"session_id":"bash-m-%s","transcript_path":"%s","tool_name":"Bash","tool_input":{"command":"cat > z.py <<EOF"}}' "$$" "$tr5" \
+  | ( cd "$bb" && python3 "$here_root/hooks/kanon-hook.py" PreToolUse ))
+[ -z "$m" ] && echo "ok    пишущие команды Bash сбором не считаются" \
+  || { echo "ОШИБКА sed -i засчитан как сбор"; fail=1; }
+command rm -rf "$bb"
+
 # Разные идентификаторы сессий не должны делить один маркер.
 mk=$(mktemp -d); tr3="$mk/tr.jsonl"
 for i in 1 2 3 4; do echo '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read"}]}}'; done > "$tr3"

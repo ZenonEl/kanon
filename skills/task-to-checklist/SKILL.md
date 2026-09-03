@@ -103,6 +103,28 @@ prohibitions.
 **"I remember" is not a source.** Material left only in the context will not
 survive to production.
 
+## Where the file goes, and its shape
+
+Four things that cost a rewrite the first time they were learned in the field:
+
+- **One item is one line.** The parser reads line by line; an item wrapped onto
+  a second line stops parsing at the wrap. Keep `check:` and `proof:` on the
+  item's line. A long item is a sign the result is not yet one observable
+  thing — split it rather than wrap it.
+- **`_kanon/` is never committed.** In your own repository add it to
+  `.gitignore`. In someone else's — a client project, a shared tree — use
+  `.git/info/exclude` instead: no commit, nothing for other people to review,
+  and it covers every worktree of that repository. Do this yourself as part of
+  opening the checklist and mention it; do not stop to ask.
+- **The file lives where the work is.** In a worktree, write it in that
+  worktree's `_kanon/`. The hooks look in the session's working directory: if
+  the session sits in the main tree while the work happens in a worktree, set
+  `KANON_DIR` to the worktree's `_kanon/`, or the sensors will not see the file.
+- **Your own decisions go into the file, not into chat.** An item that rests on
+  a judgement call of yours — not the user's, not the source's — carries that
+  provenance in Gathered: `<decision> · this session's call, not the client's,
+  awaiting confirmation`. Chat evaporates; the file is what acceptance reads.
+
 ## How an item is closed
 
 The one rule without which this degrades into paperwork:

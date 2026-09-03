@@ -216,6 +216,14 @@ Three constraints, expensive to violate:
 3. **The pre-write reminder speaks once.** A reminder on every write is noise,
    and noise stops being read.
 
+A fifth came from the first field run: **a sensor that counts tool names is
+blind to the shell.** A session in bypass mode is told by the host to read with
+`cat` and write with heredocs, and the transition it was built to catch went
+through `Bash` from end to end while the hook counted `Read` and `Write`. Bash
+is now classified by what the command does — a reading head is gathering, a
+redirect into a file is production — because the event the sensor wants is
+"a file is being written", not "a tool named Write is being called".
+
 And a fourth, learned the hard way: **a hook has to speak in the form the host
 listens to.** Plain stdout reaches the transcript only for a few event types;
 elsewhere it goes to a debug log. Two of these three hooks printed text nobody

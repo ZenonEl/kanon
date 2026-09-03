@@ -18,6 +18,9 @@ Three questions, each producing lines in the file:
 A number in the task goes into `slots:` and becomes that many lines. Do not
 start producing before the file exists.
 
+Make sure `_kanon/` is ignored by git: `.gitignore` in your own repository,
+`.git/info/exclude` in someone else's. One item is one line — never wrap.
+
 Then confirm the file is well formed:
 
 ```

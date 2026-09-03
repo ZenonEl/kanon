@@ -1,6 +1,6 @@
 # kanon
 
-[![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.10.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/code-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](SPEC/LICENSE)
 
@@ -85,7 +85,7 @@ checked by a program, and the tool fires on events rather than on phrasing.
 |---|---|
 | `scripts/check-checklist.py` | refuses `[x]` without proof, proof from the stop list of empty affirmations, a slot count that does not match, a failure pointing at a missing item |
 | `scripts/sweep.py` | derives lifetime — `open` / `closed` / `stale` — and proposes an outcome. Deletes nothing by itself |
-| `hooks/` | speaks at session start (stale, expired), once before production begins with no checklist, and at stop with the open items |
+| `hooks/` | speaks at session start (stale, expired), once before production begins with no checklist — through `Write` or through the shell — and at stop with the open items |
 
 **Nothing blocks.** A hook that gets in the way is uninstalled along with the
 plugin, and a hook that crashes is worse than none — so any internal error exits

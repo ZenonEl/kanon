@@ -107,6 +107,13 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
     ("сбор-не-опознан", "hooks/kanon-hook.py",
      'GATHERING_TOOLS = {"Read", "Grep", "Glob", "WebSearch", "WebFetch", "NotebookRead"}',
      'GATHERING_TOOLS = {"NOPE"}'),
+    ("bash-слеп-на-запись", "hooks/kanon-hook.py",
+     '    if payload.get("tool_name") == "Bash":', "    if False:"),
+    ("bash-слеп-на-сбор", "hooks/kanon-hook.py",
+     '        elif name == "Bash":', "        elif False:"),
+    ("bash-любая-команда-запись", "hooks/kanon-hook.py",
+     "    return bool(_REDIRECT.search(command) or _INPLACE.search(command))",
+     "    return True"),
     ("session-start-онемел", "hooks/kanon-hook.py",
      '    return _run("sweep.py", "--quiet")', '    return ""'),
 ]
