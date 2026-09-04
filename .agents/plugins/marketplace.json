@@ -7,7 +7,7 @@
     {
       "name": "kanon",
       "source": "./",
-      "version": "0.12.0",
+      "version": "0.12.1",
       "description": "Acceptance checklists for coding agents: observable results and their proofs, written before production starts"
     }
   ]

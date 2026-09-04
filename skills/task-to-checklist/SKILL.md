@@ -111,6 +111,13 @@ gets a failure line (`tried: … · returned: …`), and the new state gets its 
 item in words that say so: "works *without* Z" is a different result from
 "works". The easier fix is allowed; hiding that it was the easier fix is not.
 
+**For an item that says "cause found", the proof is the mechanism.** The chain
+from trigger to failure; independent occurrences converging on the same point;
+the attribution of each clue checked against its source rather than assumed;
+and — the part that closes it — the diagnosis explaining the observation that
+contradicted the first story. "Removed X, it runs" proves the workaround, not
+the cause.
+
 ### 3. What from the gathered material must reach the result?
 
 A digest into the same file: requirements, constraints, decisions found,
@@ -169,6 +176,13 @@ A failure is not redone quietly. It leaves a line:
 Otherwise the third attempt knows nothing of the first two and the work circles
 — especially after a session change. Those two fields are also ready material if
 the block later has to be explained to someone.
+
+**`returned:` is what you saw, not what the workaround did.** If the stack was in
+front of you when you chose to take the part out, the stack goes into the line
+— the chain of calls, verbatim — and `tried:` says so: `workaround, cause not
+found`. The line is written at the moment the easy path is taken, because that
+is the only moment when the evidence and the decision are both in view. A
+post-mortem the next day can only say "I saw it in the morning and did not dig".
 
 ## Acceptance
 
