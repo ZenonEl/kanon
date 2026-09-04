@@ -46,7 +46,11 @@ Recognisable symptoms:
 - an instruction given once in chat was not followed;
 - one screen out of ten was checked, not all;
 - one version was produced where several were asked for;
-- every step ends with "what next?" instead of work.
+- every step ends with "what next?" instead of work;
+- "it is not in the log, so it never ran" — from a log that never lists what
+  ran; a conclusion from absence, built on nothing;
+- the failing part was removed instead of diagnosed, and the item was closed —
+  easier, not more correct.
 
 Post-mortems explain this through character — rushed, read it carelessly,
 thought I could manage. Those explanations cannot be fixed; hurry is not
@@ -94,6 +98,18 @@ run.
 An item with no check is **allowed** but marked `[no check]`. Acceptance then
 shows how many there are. Three out of five unchecked is not a checklist but a
 list of intentions — better to learn that before delivery.
+
+**A proof by absence needs a positive control.** "Not in the log" proves
+nothing until the same log is shown to list something that *is* there. Write
+the control into the check: `check: X absent in <log>; Y (known present) listed
+in the same log`. Without the second half the check is a guess dressed as a
+grep — and the reader who insists on it is right to.
+
+**Removing the thing is not closing the item.** If an item is closed because the
+failing part was taken out, the task has changed, not been done. The old item
+gets a failure line (`tried: … · returned: …`), and the new state gets its own
+item in words that say so: "works *without* Z" is a different result from
+"works". The easier fix is allowed; hiding that it was the easier fix is not.
 
 ### 3. What from the gathered material must reach the result?
 

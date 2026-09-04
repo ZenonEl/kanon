@@ -94,6 +94,16 @@ reporting that they exist.
 `scripts/check-checklist.py` refuses the laziest cases via a stop list, in every
 supported language. That is a floor, not a guarantee.
 
+Two imitations of proof survive the stop list and were both seen in one
+session, in a post-mortem the agent wrote itself. **A proof by absence** —
+"it is not in the log, so it never ran" — from a log that never lists what ran:
+the check needs a positive control, something known to be present and shown in
+the same source, or it is a guess in the shape of a grep. And **removing the
+failing part** and closing the item: the task shrank, it was not done. The old
+item gets a failure line, the new state gets an item that says "works
+*without* Z". Both are in the skill as rules, because both looked honest at the
+moment they were written.
+
 ## 5. Why an unchecked item is allowed
 
 The temptation is to forbid it. Then people stop writing checklists: part of any
