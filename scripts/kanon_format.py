@@ -205,7 +205,7 @@ def open_checklist(path: pathlib.Path) -> str:
     fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     try:
         if os.fstat(fd).st_nlink > 1:
-            raise OSError(f"{path.name}: несколько имён у файла, не читаем")
+            raise OSError(f"{path.name}: hard-linked file, read refused")
         with os.fdopen(fd, "r", encoding="utf-8") as fh:
             return fh.read()
     except BaseException:

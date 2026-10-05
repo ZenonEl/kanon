@@ -43,7 +43,7 @@ English is primary for README, guides, changelog, contribution guidance and
 repository metadata. Human documentation has adjacent Russian translations.
 Agent instructions, code comments, CI step names and normative contracts use
 English. Conversation and checklist prose follow the user; CLI/hook messages
-default to Russian and quoted evidence stays verbatim.
+default to English and quoted evidence stays verbatim.
 
 Topics: `ai-agents`, `claude-code`, `codex`, `agent-skills`, `acceptance-testing`,
 `developer-tools`, `python`. Keep the code/docs license split visible. Release

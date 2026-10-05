@@ -42,12 +42,12 @@ jobs:
       - name: Compare marketplace mirrors
         run: |
           diff .claude-plugin/marketplace.json .agents/plugins/marketplace.json \
-            && echo "ok  зеркала совпадают"
+            && echo "ok  marketplace mirrors match"
 
       - name: Reject tracked working checklists
         run: |
           if git ls-files | grep -qE '(^|/)(_kanon|\.kanon)/'; then
-            echo "ОШИБКА: каталог чеклистов под версионным контролем — это рабочие файлы"
+            echo "ERROR: working checklists must not be tracked"
             exit 1
           fi
-          echo "ok  каталог чеклистов не отслеживается"
+          echo "ok  working checklists are not tracked"

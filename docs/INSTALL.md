@@ -73,7 +73,7 @@ python3 /path/to/kanon/scripts/retire.py report
 ```
 
 `/path/to/kanon` is a placeholder. See [cleanup](CLEANUP.md) for mutation commands.
-CLI/hook messages default to Russian; agent conversation follows your language.
+CLI/hook messages default to English; agent conversation follows your language.
 
 ## Hooks
 

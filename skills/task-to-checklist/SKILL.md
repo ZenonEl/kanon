@@ -264,7 +264,7 @@ Dates worked out in passing are worked out wrong.
 Three scripts back the rules above: `check-checklist.py` (refuses a tick without
 proof, a slot count that does not match, a line that does not parse) and
 `sweep.py` (derives lifetime, rebuilds the index), plus `retire.py` (explicit
-archive, restore, report and purge). Tool messages default to Russian. Explain
+archive, restore, report and purge). Tool messages default to English. Explain
 their outcome in the user's language; preserve quoted evidence verbatim.
 
 They live in `scripts/` **inside the plugin**, not in the user's project, so the

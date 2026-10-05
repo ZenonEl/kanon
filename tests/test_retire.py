@@ -99,7 +99,7 @@ class RetirementTests(unittest.TestCase):
         self.run_cli("restore", archived, "--apply")
         self.assertEqual(self.source.read_bytes(), PARTIAL.encode())
         self.assertFalse(archived.exists())
-        self.assertIn("восстановление", (archived.parent / "LOG.md").read_text())
+        self.assertIn("restore", (archived.parent / "LOG.md").read_text())
 
     def test_restore_collision_preserves_both(self):
         archived = self.archive()
@@ -213,7 +213,7 @@ class RetirementTests(unittest.TestCase):
         result = subprocess.run([sys.executable, str(CLI), "report"], cwd=self.root,
                                 env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("отменён", result.stdout)
+        self.assertIn("cancelled", result.stdout)
 
     def test_write_failure_keeps_original(self):
         with mock.patch("retire.directory", return_value=self.folder), mock.patch(
@@ -252,7 +252,7 @@ class RetirementTests(unittest.TestCase):
         result = subprocess.run([sys.executable, str(ROOT / "scripts/sweep.py")],
                                 cwd=self.root, env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Архив: 1", result.stdout)
+        self.assertIn("Archive: 1", result.stdout)
         self.assertIn("archive/", (self.folder / "INDEX.md").read_text())
         for event in ("Stop", "SessionStart"):
             result = subprocess.run([sys.executable, str(ROOT / "hooks/kanon-hook.py"), event],

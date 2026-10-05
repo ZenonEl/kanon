@@ -100,7 +100,7 @@ not proof that every suitable task will trigger it.
 English is primary for public documentation; Russian translations are provided
 beside it. Agent instructions and technical contracts are English. Checklists
 and agent conversation follow the user's language; quoted evidence is never
-translated. CLI/hook messages and generated indexes default to Russian.
+translated. CLI/hook messages and generated indexes default to English.
 Canonical field names stay ASCII, with EN/RU parsing aliases.
 
 ## Limits

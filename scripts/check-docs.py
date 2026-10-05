@@ -39,14 +39,14 @@ def main() -> int:
     for stem in PAIRS:
         en, ru = ROOT / f"{stem}.md", ROOT / f"{stem}.ru.md"
         if not en.is_file() or not ru.is_file():
-            errors.append(f"Нет обеих языковых версий: {stem}")
+            errors.append(f"Missing language pair: {stem}")
             continue
         if headings(en.read_text()) != headings(ru.read_text()):
-            errors.append(f"Структура разделов разошлась: {stem}")
+            errors.append(f"Section structure differs: {stem}")
         if stem == "CHANGELOG":
             versions = lambda p: re.findall(r"^## (\d+\.\d+\.\d+)\b", p.read_text(), re.M)
             if versions(en) != versions(ru):
-                errors.append("Список релизов разошёлся в CHANGELOG")
+                errors.append("Release lists differ in CHANGELOG")
 
     docs = list(ROOT.glob("*.md"))
     for folder in ("docs", "SPEC", "commands"):
@@ -58,29 +58,45 @@ def main() -> int:
             if url.scheme or url.netloc or not url.path:
                 continue
             if not (path.parent / unquote(url.path)).exists():
-                errors.append(f"Ссылка не разрешается: {path.relative_to(ROOT)} → {target}")
+                errors.append(f"Unresolved link: {path.relative_to(ROOT)} → {target}")
 
     code = list((ROOT / "scripts").glob("*.py")) + list((ROOT / "hooks").glob("*.py")) + list((ROOT / "tests").glob("*.py"))
     for path in code:
         source = path.read_text()
         for token in tokenize.generate_tokens(io.StringIO(source).readline):
             if token.type == tokenize.COMMENT and CYRILLIC.search(token.string):
-                errors.append(f"Комментарий кода не английский: {path.relative_to(ROOT)}:{token.start[0]}")
-        for node in ast.walk(ast.parse(source)):
+                errors.append(f"Code comment is not English: {path.relative_to(ROOT)}:{token.start[0]}")
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
             if isinstance(node, (ast.Module, ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
                 doc = ast.get_docstring(node)
                 if doc and CYRILLIC.search(doc):
-                    errors.append(f"Docstring не английский: {path.relative_to(ROOT)}")
+                    errors.append(f"Docstring is not English: {path.relative_to(ROOT)}")
+
+        if path.parent.name in ("scripts", "hooks"):
+            # Accepted input aliases and regexes are multilingual; generated text is English.
+            input_fields = {
+                "kanon_format.py": {"SECTIONS", "FIELD_ALIASES", "NO_CHECK", "EMPTY_PROOF"},
+                "check-checklist.py": {"QUANTITY"}, "check-docs.py": {"CYRILLIC"},
+            }.get(path.name, set())
+            allowed = set()
+            for node in tree.body:
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+                if any(isinstance(t, ast.Name) and t.id in input_fields for t in targets):
+                    allowed.update(id(child) for child in ast.walk(node))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Constant) and isinstance(node.value, str) and CYRILLIC.search(node.value) and id(node) not in allowed:
+                    errors.append(f"Generated text is not English: {path.relative_to(ROOT)}:{node.lineno}")
 
     for path in list((ROOT / "commands").glob("*.md")) + list((ROOT / "skills").glob("*/SKILL.md")):
         # Descriptions can quote Russian user input; instruction bodies are English.
         body = re.sub(r"\A---\n.*?\n---\n", "", path.read_text(), count=1, flags=re.S)
         if CYRILLIC.search(body):
-            errors.append(f"Инструкции агенту не английские: {path.relative_to(ROOT)}")
+            errors.append(f"Agent instructions are not English: {path.relative_to(ROOT)}")
     for message in errors:
-        print(f"Ошибка: {message}")
+        print(f"Error: {message}")
     if not errors:
-        print("Документация: пары, разделы и ссылки согласованы; технические инструкции английские.")
+        print("Documentation: language pairs, sections and links consistent; technical instructions English.")
     return bool(errors)
 
 

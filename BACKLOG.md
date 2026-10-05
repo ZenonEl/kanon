@@ -22,7 +22,7 @@ criteria. A date alone does not establish readiness.
 - [x] Explicit retirement: archive deferred, cancelled, superseded or completed
       work; restore original bytes; save a trail before purge. See 0.13.0.
 - [x] EN-primary/RU human documentation, English agent/code instructions,
-      Russian runtime messages and documentation consistency checks. See 0.13.0.
+      English runtime messages and documentation consistency checks. See 0.13.0.
 
 ## Constraints
 

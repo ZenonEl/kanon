@@ -88,7 +88,7 @@ work stopped. [Retirement contract](../SPEC/RETIREMENT.md).
 English technical instructions and EN/RU human guides serve different readers.
 The checklist follows the user's language. Quoted evidence remains in its source
 language because translating it breaks comparison with the original. Runtime
-messages default to Russian; canonical keys are stable ASCII with parsing aliases.
+messages default to English; canonical keys are stable ASCII with parsing aliases.
 
 ## Boundaries and neighboring tools
 

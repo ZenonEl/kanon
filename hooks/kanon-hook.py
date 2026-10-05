@@ -255,11 +255,11 @@ def on_pre_tool_use(payload: dict) -> str:
         return ""
 
     return (
-        "kanon: собранное сейчас живёт только в контексте, а производство уже "
-        "началось — при сжатии или в новой сессии оно не доживёт.\n"
-        "Заведи чеклист приёмки (/kanon:open или навык task-to-checklist): "
-        "что должно быть на выходе, чем проверяется, что из собранного обязано "
-        "попасть в результат.\n"
+        "kanon: gathered material lives only in context, but production has "
+        "started — it may be lost on compaction or in a new session.\n"
+        "Create an acceptance checklist (/kanon:open or task-to-checklist): "
+        "required results, their checks, and gathered constraints that must "
+        "reach the output.\n"
     )
 
 
@@ -273,14 +273,14 @@ def on_stop(_: dict) -> str:
             continue
         lines.append(f"kanon · {doc.path.name}: "
                      f"{len(doc.items) - len(open_items)}/{len(doc.items)} "
-                     f"закрыто доказательством")
+                     f"closed with proof")
         for item in open_items[:5]:
-            mark = "отмечен без доказательства" if item.ticked else "открыт"
-            lines.append(f"    {item.number}. {item.text or '<пустой слот>'} — {mark}")
+            mark = "ticked without proof" if item.ticked else "open"
+            lines.append(f"    {item.number}. {item.text or '<empty slot>'} — {mark}")
         if len(open_items) > 5:
-            lines.append(f"    …и ещё {len(open_items) - 5}")
+            lines.append(f"    …and another {len(open_items) - 5}")
     if lines:
-        lines.append("«сделано» звучит, когда закрыты все. иначе — перечисли недостачу.")
+        lines.append("Say done only when every item is closed; otherwise list the shortfall.")
     return "\n".join(lines)
 
 

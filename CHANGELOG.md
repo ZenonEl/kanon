@@ -15,10 +15,10 @@
   changed sources, corrupt archives and write/log failures. CRLF inputs retain
   exact original bytes; disposal logs retain original open-item markers.
 - Standardized English agent/code instructions and EN-primary/RU human guides.
-  Runtime messages and generated indexes default to Russian. Synchronized
+  Runtime messages and generated indexes default to English. Synchronized
   license tables, installation and documentation checks.
 - Retired the proposed aggressive hook. Existing hook thresholds, frequency and
-  nonblocking behavior are unchanged. No repository publication or history change.
+  nonblocking behavior are unchanged. Repository visibility is unchanged.
 
 ## 0.12.1
 

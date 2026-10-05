@@ -21,16 +21,16 @@ when there is no decision or the proposed disposition changes agreed scope.
 ## Preview and archive
 
 Run from the working project. Replace `/path/to/kanon` with the installed plugin
-path. These examples are in Russian because tool messages and decision records
-are user-facing; the CLI flags remain canonical.
+path. Tool messages are English; reasons and decision sources follow the user's
+language. CLI flags remain canonical.
 
 ```bash
 python3 /path/to/kanon/scripts/retire.py archive _kanon/task.md \
   --disposition deferred \
-  --reason 'Возвращаемся после запуска' \
-  --decision-source 'issue #42, решение владельца' \
-  --continued-in 'issue #43, оставшиеся пункты' \
-  --revisit 'После запуска'
+  --reason 'Return after launch' \
+  --decision-source 'issue #42, owner decision' \
+  --continued-in 'issue #43, remaining items' \
+  --revisit 'After launch'
 ```
 
 Without `--apply`, the command prints a plan and changes nothing. Verify that
@@ -69,7 +69,7 @@ replaced work survives at its continuation address. Then preview:
 
 ```bash
 python3 /path/to/kanon/scripts/retire.py purge _kanon/archive/<archived-file>.md \
-  --evidence-in 'issue #43 и reports/final.txt'
+  --evidence-in 'issue #43 and reports/final.txt'
 ```
 
 The CLI requires `--evidence-in` when the file contains proof. It verifies the
