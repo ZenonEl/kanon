@@ -1,15 +1,8 @@
 #!/usr/bin/env python3
-"""Сверить номер версии во всех местах, где он записан.
+"""Check plugin versions in four manifests and two README badges.
 
-Манифестов четыре — Claude Code, его маркетплейс, зеркало маркетплейса для
-Codex-совместимых хостов и сам Codex, — плюс бейджи в двух README. Оба хоста при
-обновлении сравнивают ТОЛЬКО номер версии: отставший манифест означает, что
-правка не доедет до установленных копий, а команда обновления отрапортует, что
-всё уже свежее. Расхождение тихое, поэтому проверка машинная.
-
-Заодно проверяется, что версия описана в CHANGELOG: версия без записи о том, что
-в ней изменилось, для потребителя равна её отсутствию.
-"""
+Hosts compare the version when updating, so a stale manifest prevents delivery.
+Each release also requires a matching CHANGELOG entry."""
 import json
 import pathlib
 import re
@@ -71,14 +64,10 @@ if not SEMVER.match(version):
     print(f"\n{version!r} — не semver вида X.Y.Z")
     sys.exit(1)
 
-changelog = ROOT / "CHANGELOG.md"
-if not changelog.exists():
-    print("\nCHANGELOG.md отсутствует")
-    sys.exit(1)
-
-if f"## {version}" not in changelog.read_text(encoding="utf-8"):
-    print(f"\nв CHANGELOG.md нет записи '## {version}' — версия без описания "
-          "изменений для потребителя равна её отсутствию")
-    sys.exit(1)
+for filename in ("CHANGELOG.md", "CHANGELOG.ru.md"):
+    changelog = ROOT / filename
+    if not changelog.exists() or f"## {version}" not in changelog.read_text(encoding="utf-8"):
+        print(f"\nВ {filename} нет записи '## {version}' — версия без описания изменений")
+        sys.exit(1)
 
 print(f"\nверсии совпадают: {version}, запись в CHANGELOG есть")

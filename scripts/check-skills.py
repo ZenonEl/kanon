@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
-"""Проверить, что скилы и команды вообще смогут сработать.
+"""Validate skill and command routing metadata.
 
-Скил, до которого не доходит маршрутизация, не «редко срабатывает» — он не
-существует. Проверяется то, что можно проверить машиной: наличие файла, валидный
-frontmatter, обязательные поля, имя каталога, совпадающее с `name`, и непустое
-описание достаточной длины, чтобы в нём поместились триггеры.
-
-Содержательное качество описания машина не проверяет и не должна: она видит
-только форму. Смысловая проверка — на человеке.
-"""
+Checks file placement, frontmatter, required fields and description length.
+These structural checks do not measure automatic selection on a live prompt."""
 import pathlib
 import re
 import sys

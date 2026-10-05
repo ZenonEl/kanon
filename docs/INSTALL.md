@@ -1,134 +1,127 @@
-# Install
+# Installation
 
-**License:** CC BY-SA 4.0 · Russian: [`INSTALL.ru.md`](INSTALL.ru.md)
+**License:** [CC BY-SA 4.0](../SPEC/LICENSE) · [Русский](INSTALL.ru.md)
 
-One repository serves two hosts. The difference between them matters and is
-worth knowing before you install.
+## Requirements
 
-| | Claude Code | Codex |
-|---|---|---|
-| Entry points | skills **and** slash commands | **skills only** |
-| Manifest | `.claude-plugin/plugin.json` | `.codex-plugin/plugin.json` |
-| Marketplace | `.claude-plugin/marketplace.json` | `.agents/plugins/marketplace.json` |
-| Hooks | shipped by the plugin | same file, since Codex 0.149 — after trust review in `/hooks` |
+Python 3.10+; no Python packages to install. The archive/restore/purge CLI needs
+POSIX directory descriptors and advisory file locking (Linux/macOS).
 
-Codex has no slash commands as a class. All of kanon's work is therefore
-reachable through the `task-to-checklist` skill; the `/kanon:*` commands are
-shortcuts over it. Under Codex the same result is reached in words, and the
-scripts are run directly.
-
-Requirements: Python 3.10+ for the scripts and hooks. Nothing else.
+Claude Code uses the skill and five slash commands. Codex uses the skill and
+scripts. Both hosts can load `hooks/hooks.json`; host trust/settings determine
+whether hooks run. Automatic skill selection must be observed separately.
 
 ## Claude Code
 
-### From the marketplace
+In Claude Code:
 
-```
+```text
 /plugin marketplace add ZenonEl/kanon
 /plugin install kanon@kanon
 ```
 
-### Locally, for development
+Check that Kanon is enabled with `/plugin`. For a local development checkout,
+register its directory as a marketplace instead:
 
-```
-git clone https://github.com/ZenonEl/kanon.git
+```text
 /plugin marketplace add ./kanon
 /plugin install kanon@kanon
 ```
 
-### Verify
-
-```
-/plugin
-```
-
-`kanon` should be listed as enabled. Then, in a fresh session and **without
-naming the plugin**, say something like "we gathered the material, now build
-it". The skill should raise itself. If it does not, the problem is routing, not
-the files — see below.
+Updating an installed copy uses the host's normal update flow; restart the
+session after an update. Editing the development checkout does not itself update
+an installed cache.
 
 ## Codex
 
-```
+```bash
 codex plugin marketplace add https://github.com/ZenonEl/kanon.git
 codex plugin add kanon --marketplace kanon
 ```
 
-A bare clone into a plugins directory is **not** enough: the host discovers
-plugins through a marketplace, and a copied tree is reported as
-`No marketplace plugins found`. Verified against the current CLI.
+These command forms match the locally available CLI help. A copied checkout
+alone does not register a marketplace. Use `codex plugin list` to inspect the
+installation and the host's hook settings to review/trust hooks.
 
-**Hooks run under Codex too** (measured live on 0.149.0, 2026-09-03). Codex
-reads the same `hooks/hooks.json`, speaks the same wire — `tool_name` is `Bash`
-for shell and `apply_patch` for edits, with the patch text in
-`tool_input.command` — substitutes `${CLAUDE_PLUGIN_ROOT}` in hook commands and
-shows `systemMessage`. What differs: every hook must be **trusted once** in
-`/hooks` before it runs, and `transcript_path` is either empty or a rollout in
-Codex's own format, so kanon counts gathering by its own tally of the `Bash`
-calls that pass through the hook rather than by the transcript.
+Hook compatibility was measured on Codex 0.149.0 on 2026-09-03: shell calls
+arrived as `Bash`, patches as `apply_patch`, and `systemMessage` was visible.
+That is a recorded measurement, not a guarantee about every future host version.
+If hooks are absent or disabled, the skill and explicit CLI remain available.
 
-`${CLAUDE_PLUGIN_ROOT}` is set for hook commands only. In the skill body, under
-Codex, call the scripts by the plugin cache path:
-`~/.codex/plugins/cache/<marketplace>/<plugin>/<version>/scripts/check-checklist.py`.
+## Script paths
 
-## What the hooks do
+Scripts belong to the plugin, not to the project being worked on. Run them from
+that project's working directory and use the installed plugin's absolute path.
 
-Shipped in `hooks/hooks.json` and active in Claude Code only. **None of them
-block anything** — they only speak.
+A Codex cache commonly places them under:
 
-| Event | When it speaks |
-|---|---|
-| `SessionStart` | a checklist is stale, or a closed one has expired |
-| `PreToolUse` on a write | gathering happened, no checklist exists, production started — **once per session**. A write is `Write`/`Edit`, or a `Bash` command that redirects into a file, uses `tee` or `sed -i`; gathering is `Read`/`Grep`/`Glob`, or a `Bash` command whose head is a reader (`cat`, `sed -n`, `git log`…) |
-| `Stop` | open items remain; lists them |
-
-Bash is classified by content because a session in bypass mode is told by the
-host to read and write through the shell, and a sensor counting only tool names
-is blind there by construction. A misclassification costs one extra reminder.
-
-The pre-write reminder deliberately stays silent when: an open checklist already
-exists, the write targets `_kanon/` itself, fewer than three gathering
-operations happened in the session, or it already spoke once.
-
-A hook that fails exits 0 and says nothing. A broken hook is worse than no hook.
-
-Plain stdout only reaches the transcript for `SessionStart`, `UserPromptSubmit`
-and `UserPromptExpansion`; for everything else the host writes it to the debug
-log. So `PreToolUse` and `Stop` emit JSON with a `systemMessage` field instead.
-Neither sets `decision` or `permissionDecision` — that would block, and nothing
-here blocks.
-
-## If the skill does not fire
-
-Diagnose in this order, most common first:
-
-1. **The skill is not in the list.** Then it is placement, not wording: the path
-   is `skills/<name>/SKILL.md`, `SKILL.md` in capitals, valid YAML frontmatter,
-   and the directory existed when the session started.
-2. **Listed but not raised.** Then it is the `description`: routing reads only
-   that, and never the body. The phrases you actually say must appear in it
-   verbatim, in your language.
-3. **Raised at the wrong time.** The threshold is documented in the skill: kanon
-   stays silent on small edits by design. That is not a fault.
-
-Form is checked mechanically:
-
+```text
+~/.codex/plugins/cache/<marketplace>/kanon/<version>/scripts/
 ```
+
+Claude Code has a similar cache under `~/.claude/plugins/cache/`. Locate the
+actual version rather than assuming that a development checkout is installed.
+Hook commands receive `${CLAUDE_PLUGIN_ROOT}` from their host; an ordinary shell
+may not have it. If it is missing, use the verified cache path.
+
+Examples after resolving the path:
+
+```bash
+python3 /path/to/kanon/scripts/check-checklist.py
+python3 /path/to/kanon/scripts/sweep.py
+python3 /path/to/kanon/scripts/retire.py report
+```
+
+`/path/to/kanon` is a placeholder. See [cleanup](CLEANUP.md) for mutation commands.
+CLI/hook messages default to Russian; agent conversation follows your language.
+
+## Hooks
+
+| Event | Output |
+|---|---|
+| `SessionStart` | Stale active checklists and closed containers due for review |
+| `PreToolUse` | One reminder when production starts after at least three gathering calls without an active checklist |
+| `Stop` | Active items still open or ticked without proof |
+
+Writes include `Write`, `Edit`, `NotebookEdit`, writing Bash commands and
+`apply_patch`. Reading Bash commands count as gathering. The local Bash tally
+covers sessions without a compatible transcript.
+
+The production reminder is silent for checklist writes, when an open/stale
+checklist already exists, below the gathering threshold, and after its first
+reminder. Archived files do not trigger active reminders. No hook blocks work;
+internal failures return zero. The thresholds are intentionally unchanged.
+
+## Verify and diagnose
+
+In a fresh session, give an ordinary task involving gathering followed by
+production, without naming Kanon. Observe whether the skill is selected and a
+checklist is created before implementation. If you invoke it manually, record
+that separately: it does not prove automatic routing.
+
+1. Missing from the skill list: check marketplace registration, enabled state,
+   `skills/task-to-checklist/SKILL.md` and valid frontmatter.
+2. Listed but not selected: record the exact prompt and plugin/host version.
+   Routing reads the skill description; structural validation cannot diagnose it.
+3. Selected for a tiny edit: check the skill's threshold before treating it as a bug.
+4. Hooks silent: inspect host trust/settings and whether a compatible event reached
+   the hook. A working Stop hook does not prove automatic skill selection.
+
+From a development checkout:
+
+```bash
 python3 scripts/check-skills.py
 ```
 
-It sees form only — file, frontmatter, required fields, description length.
-Whether a live phrase raises the skill it cannot know. That is measured by a run
-(`claude plugin eval`, currently in early access) or by keeping a log.
+This checks form only. Live selection needs observation or a routing evaluation
+with a comparable no-plugin run; no availability claim about eval access is made.
 
 ## Working files
 
-Checklists are written to `_kanon/` in the working project root and are **not
-committed**: scaffolding, not results. Add to the project's `.gitignore`:
+Add `_kanon/` to `.gitignore` in your project, or `.git/info/exclude` in a shared
+repository. The plugin itself is safe to version; checklists, archives and logs
+contain working material and stay out of commits.
 
-```
-_kanon/
-```
-
-Done already in this repository, and CI checks separately that `_kanon/` never
-entered version control.
+Use `KANON_DIR` for another location. In a worktree, write the checklist where
+work happens or point the session at that directory. Discovery is shallow:
+`archive/` is separate from the active list, and `INDEX.md` is derived.

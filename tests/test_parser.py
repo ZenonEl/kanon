@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
-"""Проверки поведения разбора, а не кода возврата.
+"""Check parsed values against normative checklist rules.
 
-Заведены после того, как выяснилось: пять правок из семи держались тестами,
-которые смотрели только `rc`, и откат любой из них проходил молча. Здесь каждый
-ассерт привязан к конкретному правилу спеки и падает, если правило откатить.
-
-Каждый тест назван правилом, которое защищает. Если тест не может покраснеть от
-отката этого правила — он бесполезен и его надо переписать, а не оставлять для
-счёта.
-"""
+Tests are named for outcomes and must fail when the relevant protection is removed."""
 from __future__ import annotations
 
 import datetime as dt
@@ -56,7 +49,7 @@ def doc(items: str, closed: str = "null", slots: str = "null", age_days: int = 0
     return parse(path)
 
 
-# --- правило 3: доказательство, а не отметка ------------------------------
+# --- proof rather than ticks ---
 
 d = doc("- [x] 1. r · check: c · proof: готово · 2026-09-02\n")
 check("стоп-лист не обходится хвостом после пустого утверждения",
@@ -73,7 +66,7 @@ check("сегмент без ключа приклеивается, а не от
       d.items[0].has_proof and "строка 3" in d.items[0].fields["proof"],
       f"proof={d.items[0].fields.get('proof')!r}")
 
-# --- правило 4: метка «без проверки» --------------------------------------
+# --- standalone no-check marker ---
 
 d = doc("- [ ] 1. описать соглашение [no check] в доке · check: c\n")
 check("[no check] внутри текста не делает пункт непроверяемым",
@@ -82,7 +75,7 @@ check("[no check] внутри текста не делает пункт неп�
 d = doc("- [ ] 1. r · [no check]\n")
 check("[no check] отдельным сегментом опознаётся", d.items[0].no_check)
 
-# --- правило 1 и разбор разделов -----------------------------------------
+# --- observable items and section parsing ---
 
 d = doc("- [x] 1. res · proof: коммит a1b2c3d\n- [ ] без номера · check: c\n")
 check("строка, похожая на пункт и не разобравшаяся, попадает в malformed",
@@ -101,7 +94,7 @@ d = parse(path)
 check("пустой раздел приёмки виден как пустой",
       d.had_acceptance_section and not d.items)
 
-# --- состояния: таблица States спеки --------------------------------------
+# --- derived states ---
 
 d = doc("- [x] 1. r · check: c · proof: коммит a1b2c3d\n", age_days=30)
 check("stale при закрытых пунктах: closed пусто И 14 дней",
@@ -116,12 +109,12 @@ check("свежий незакрытый — open", d.state == "open", f"state={
 d = doc("- [ ] 1. r · check: c\n", closed="2026-08-20", age_days=30)
 check("проставленный closed сильнее возраста", d.state == "closed", f"state={d.state}")
 
-# --- смешение языков -------------------------------------------------------
+# --- mixed languages ---
 
 d = doc("- [x] 1. кнопка работает · check: скрин · подтв: out/скрин.png, коммит a1b2c3d\n")
 check("смешанные ключи и кириллица в значении", d.items[0].has_proof)
 
-# --- границы, которые держат таблицы States и Lifetime -------------------
+# --- state and lifetime boundaries ---
 
 d = doc("- [ ] 1. r · check: c\n", age_days=14)
 check("граница stale ровно на 14 дне", d.state == "stale", f"state={d.state}")
@@ -138,7 +131,7 @@ d = doc("- [x] 1. r · check: c · proof: коммит a1b2c3d\n",
         closed=str(today - dt.timedelta(days=6)))
 check("на шестой день ещё не истёк", d.expires_in == 1, f"expires_in={d.expires_in}")
 
-# --- находки Codex: границы представлений ---------------------------------
+# --- representation-boundary regressions ---
 
 d = doc("- [ ] 1. результат без проверки и без пометки\n")
 check("пункт без check: и без [no check] распознан как таковой",
@@ -174,7 +167,7 @@ path.write_text(HEAD.format(closed="null", slots="null").replace("- x · y", "- 
 d = parse(path)
 check("пустой буллет не считается собранным материалом", not d.gathered)
 
-# --- решение о ссылке привязано к открытому файлу -------------------------
+# --- link decisions bound to the opened file ---
 
 import os as _os  # noqa: E402
 from kanon_format import find, open_checklist  # noqa: E402
@@ -190,7 +183,7 @@ regular.write_text(HEAD.format(closed="null", slots="null")
 
 found, skipped = find(box)
 regular.unlink()
-regular.symlink_to(outside)          # подмена между обходом и чтением
+regular.symlink_to(outside)          # swap between discovery and open
 try:
     open_checklist(found[0])
     raced = True

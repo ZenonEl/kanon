@@ -1,6 +1,6 @@
 ---
 name: task-to-checklist
-description: "Use at the moment work turns from gathering into producing — when research, a brief, a spec or a plan is about to become code, layout, a document or a design. Turns the task into an acceptance checklist in a file while the context is still fresh, so the work survives compaction and a new session. Also use when closing an item with proof, or when asking whether the work is actually finished. Triggers on: now build it, go ahead and build, start implementing, let's produce, we gathered enough, follow the plan and make it, make several variants, check all the screens, is it done, can we ship, what is left, acceptance, I finished, prove it. Триггеры: иди делай, теперь делай, приступай, начинай верстать, собрали приступаем, по этому плану сделай, сделай несколько вариантов, проверь все экраны, всё ли готово, можно сдавать, что ещё осталось, приёмка, я всё сделал, готово, чем докажешь."
+description: "Use when gathered research, a brief or a plan becomes code, layout, a document or a design; write observable results and proof requirements before production. Also use for acceptance, closing items with evidence, or retiring inactive checklists. Triggers: now build it, start implementing, follow the plan, make several variants, check all screens, is it done, what is left, acceptance, prove it, archive stale checklists. Russian input examples: иди делай, теперь делай, приступай, по этому плану сделай, сделай несколько вариантов, проверь все экраны, всё ли готово, что ещё осталось, приёмка, чем докажешь, убери старые каноны, чеклисты копятся, отложи эту задачу."
 ---
 
 # Task to checklist
@@ -203,8 +203,13 @@ shortfall.
 
 ## Do not ask "what next?"
 
-While the file holds open items there is nothing to ask: next is the next open
-item.
+While the task is still active and the file holds open items, continue with the
+next open item. Do not ask for permission already given by the user.
+
+If the task is deferred, cancelled or replaced, retire its checklist using the
+existing decision rather than pursuing obsolete work. A difficult item alone
+does not authorize cancellation. Never turn an unfinished item into completed
+work to silence reminders.
 
 A "what next?" after every step is a symptom of a missing check — when there is
 no way to verify yourself, all that remains is to ask a human. The file takes
@@ -218,15 +223,34 @@ does not.**
 | State | Lifetime |
 |---|---|
 | open | never expires |
-| closed | 7 days, then dropped |
-| stale (not closed, 14 days idle) | **surfaced, never dropped** |
+| closed | review after 7 days; no automatic deletion |
+| stale (not closed, 14 days idle) | surfaced; continue or explicitly retire |
 
 Dropping an unclosed checklist silently erases the very shortfall it exists to
 show.
 
-Three outcomes on expiry: **drop** (default for closed), **extract** (proofs
-move somewhere long-lived, container deleted), **keep** (rare — the checklist
-became a document).
+Use explicit retirement when an inactive checklist is cluttering the active
+directory. `retire.py archive` preserves its original content under `archive/`
+and records a disposition: `deferred`, `cancelled`, `superseded` or `completed`.
+Only `completed` requires all items closed with proof. Other dispositions leave
+outstanding items outstanding. Supply a reason and the source of the decision;
+deferred work also needs a continuation address and return condition, superseded
+work a replacement address. Follow [`SPEC/RETIREMENT.md`](../../SPEC/RETIREMENT.md).
+
+Resolve continuation/replacement addresses and check that they retain the open
+requirements and relevant attempts. Existing owner instructions are sufficient
+authorization; do not ask the same question again. Ask only if the decision is
+missing or changes agreed scope.
+
+`retire.py restore` returns the exact original checklist. `retire.py report`
+lists archived decisions and suggests review after 30 days. Age never deletes
+anything. `retire.py purge` is a separate, permanent operation: first verify that
+valuable evidence and remaining work survive elsewhere, then pass the evidence
+destination. It saves a compact decision trail in `archive/LOG.md` before removing
+the file. Never delete that log during checklist cleanup.
+
+All mutation commands preview by default; `--apply` performs the already-authorized
+operation on one file. Never use a blanket shell deletion as checklist cleanup.
 
 **Expiry is also a check.** If the file feels too valuable to delete, the proof
 never moved anywhere, which means the work is not closed. That is a reason to
@@ -237,15 +261,18 @@ Dates worked out in passing are worked out wrong.
 
 ## Running the scripts
 
-Two scripts back the rules above: `check-checklist.py` (refuses a tick without
+Three scripts back the rules above: `check-checklist.py` (refuses a tick without
 proof, a slot count that does not match, a line that does not parse) and
-`sweep.py` (derives lifetime, rebuilds the index).
+`sweep.py` (derives lifetime, rebuilds the index), plus `retire.py` (explicit
+archive, restore, report and purge). Tool messages default to Russian. Explain
+their outcome in the user's language; preserve quoted evidence verbatim.
 
 They live in `scripts/` **inside the plugin**, not in the user's project, so the
 path depends on the host:
 
-- **Claude Code** — the plugin root is in `${CLAUDE_PLUGIN_ROOT}`:
-  `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check-checklist.py"`
+- **Claude Code** — use `${CLAUDE_PLUGIN_ROOT}` if the shell has it:
+  `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check-checklist.py"`. Otherwise locate
+  the installed version under `~/.claude/plugins/cache/` and use its absolute path.
 - **Codex and anything else** — that variable is not set in your shell. Use the
   plugin cache path, e.g.
   `python3 ~/.codex/plugins/cache/kanon/kanon/<version>/scripts/check-checklist.py`

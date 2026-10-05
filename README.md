@@ -1,131 +1,131 @@
 # kanon
 
-[![Version](https://img.shields.io/badge/version-0.12.1-blue.svg)](CHANGELOG.md)
-[![License](https://img.shields.io/badge/code-AGPL--3.0--or--later-blue.svg)](LICENSE)
-[![Docs](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](SPEC/LICENSE)
+[![Version](https://img.shields.io/badge/version-0.13.0-blue.svg)](CHANGELOG.md)
+[![Code license](https://img.shields.io/badge/code-AGPL--3.0--or--later-blue.svg)](LICENSE)
+[![Docs license](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](SPEC/LICENSE)
 
 **English** · [Русский](README.ru.md)
 
-Kanon is a Claude Code plugin and Codex skill that turns a task into an
-acceptance checklist — a file of observable results and the proof each one
-requires — **before** production starts, while the gathered context is still
-fresh.
+Kanon turns a coding agent's task into an acceptance checklist **before work
+starts**: observable results, checks and the proof needed to close each item.
+The file preserves requirements and decisions across context compaction, a new
+session or a different agent.
 
-The name is the Greek κανών: not a canon in the sense of dogma, but a
-carpenter's measuring rod. The thing you lay against the work to see whether it
-is straight.
+It is a plugin for Claude Code and Codex, with a small Python CLI. The name comes
+from Greek κανών, a carpenter's measuring rod.
 
-## The problem
+## Why
 
-Gathering eats the context window. Production starts afterwards and runs on
-what is left. The agent does not ignore the research — it cannot see it.
+Research can disappear from the working context while implementation continues.
+A plan can be executed while a requested screen, variant or constraint is still
+missing. Kanon writes those results down while the material is fresh, then makes
+missing proof and unfilled slots visible at acceptance.
 
-The symptoms are recognisable:
+## Example
 
-- the material was collected but is absent from the result — "I did it from
-  memory";
-- an instruction given once in chat was not followed;
-- one screen out of ten was checked, not all of them;
-- one version was produced where several were asked for;
-- every step ends with "what next?" instead of work.
+An item closes by adding evidence:
 
-Post-mortems usually explain this through character — *rushed*, *read it
-carelessly*, *thought I could manage*. Those explanations cannot be fixed. You
-cannot patch hurry.
+```markdown
+- [ ] 1. All requested screens fit at 360 px · check: browser screenshots
+- [x] 2. Import preserves existing entries · check: import regression · proof: reports/import.txt
+```
 
-The real cause is the same for all of them: between *understood the task* and
-*started working* there was no step that turns the task into a list where a
-shortfall is visible. None of the failures had a check that could go red.
-
-## What it does
-
-Three questions, each of which must produce lines in a file:
-
-1. **What must exist for the task to count as done?** Observable results, not
-   actions. A number in the task becomes a number of slots — an empty slot is
-   visible, "as many as I manage" is not.
-2. **What proves each item?** A command, a screenshot path, a commit hash. An
-   item with no check is allowed but marked, and acceptance shows how many
-   there are.
-3. **What from the gathered material must reach the result?** A digest, written
-   down. *"I remember"* is not a source.
-
-Then one rule that keeps the rest from rotting:
-
-> **An item is closed by inserting proof, not by ticking a box.**
-
-`[x]` without evidence reads as open. "Done", "checked", "works" are claims with
-nothing to argue against.
-
-## Why the file, not the context
-
-Because the file survives what the context does not: compaction, a new session,
-a different agent picking the work up. It is written early — right after
-gathering, before the first line of production — for exactly that reason.
-
-## What it deliberately does not do
-
-- **It does not judge taste.** A default palette or a templated composition is
-  not a shortfall in a list.
-- **It does not check the quality of the decomposition.** A badly split task
-  yields a green checklist over a bad split. The only cure is a second pair of
-  eyes on the checklist itself, before the work starts.
-- **It does not replace review.** A closed checklist means *nothing was
-  forgotten*, not *this is good*.
-
-The boundary is deliberate. A tool that promises more than it verifies is worse
-than no tool: a green list starts being read as a guarantee.
-
-## Sensors, not just rules
-
-A rule nobody enforces holds for about a week. So the checkable rules are
-checked by a program, and the tool fires on events rather than on phrasing.
-
-| Piece | What it does |
-|---|---|
-| `scripts/check-checklist.py` | refuses `[x]` without proof, proof from the stop list of empty affirmations, a slot count that does not match, a failure pointing at a missing item |
-| `scripts/sweep.py` | derives lifetime — `open` / `closed` / `stale` — and proposes an outcome. Deletes nothing by itself |
-| `hooks/` | speaks at session start (stale, expired), once before production begins with no checklist — through `Write` or through the shell — and at stop with the open items |
-
-**Nothing blocks.** A hook that gets in the way is uninstalled along with the
-plugin, and a hook that crashes is worse than none — so any internal error exits
-0 in silence. The pre-write reminder speaks once per session.
-
-## Languages
-
-Write the checklist in whatever language you work in. Only the machine tokens
-are fixed ASCII — `check:`, `proof:`, `tried:`, `returned:`, `[no check]` and
-the section names — and each has documented aliases per language, so the linter
-parses either. English and Russian ship today; a new language is one row in the
-alias table.
+`[x]` with `proof: done` is still open. A quantity in the task becomes a matching
+number of acceptance slots. Gathered constraints and failed attempts stay in the
+same file. [Full format](SPEC/FORMAT.md).
 
 ## Install
 
-See [`docs/INSTALL.md`](docs/INSTALL.md) for Claude Code and Codex.
+Claude Code:
+
+```text
+/plugin marketplace add ZenonEl/kanon
+/plugin install kanon@kanon
+```
+
+Codex:
+
+```bash
+codex plugin marketplace add https://github.com/ZenonEl/kanon.git
+codex plugin add kanon --marketplace kanon
+```
+
+The linter and hooks need Python 3.10+. The retirement CLI requires Linux/macOS
+with POSIX directory descriptors. See [installation and verification](docs/INSTALL.md)
+for hook trust, local development and script paths.
+
+## Workflow
+
+1. Gather the material, then write the checklist before production.
+2. Keep one observable result per line, with its check or an explicit no-check marker.
+3. Close items with evidence; record failures with the attempt and verbatim result.
+4. At acceptance, read every item and its proof. Report what remains open.
+5. Explicitly retire an inactive task instead of keeping it in the active list forever.
+
+Claude Code provides `/kanon:open`, `/kanon:close`, `/kanon:accept`,
+`/kanon:sweep` and `/kanon:retire`. Codex reaches the same operations through
+the `task-to-checklist` skill and scripts.
+
+## Cleanup without false completion
+
+Active files live under `_kanon/`; retired files under `_kanon/archive/`.
+Archive with a reason and a decision source as **deferred**, **cancelled**,
+**superseded** or **completed**. Only the last means all items have proof.
+Deferred work needs a continuation address and a return condition.
+
+`retire.py` previews every mutation by default. `--apply` archives, restores or
+purges one selected file. Restore returns the exact original bytes. Purge saves
+a decision trail first and requires surviving destinations for evidence. Nothing
+is deleted automatically by age. [Cleanup examples](docs/CLEANUP.md).
+
+Keep `_kanon/` out of git: use `.gitignore` in your own project or
+`.git/info/exclude` in a shared repository. Checklists are working data.
+
+## Sensors
+
+| Component | Role |
+|---|---|
+| `check-checklist.py` | Refuses missing/empty proof, malformed items and mismatched slot counts |
+| `sweep.py` | Reports stale/expired containers and rebuilds the active index |
+| Hooks | Surface stale work at session start, remind once before production without a checklist, and list open items at Stop |
+| `retire.py` | Explicit archive, restore, archive report and permanent disposal |
+
+Hooks do not block. Internal hook failures exit zero; the production reminder
+speaks at most once per session. Archived work does not enter active reminders.
+Automatic skill selection is still being evaluated; installing the plugin is
+not proof that every suitable task will trigger it.
+
+## Languages
+
+English is primary for public documentation; Russian translations are provided
+beside it. Agent instructions and technical contracts are English. Checklists
+and agent conversation follow the user's language; quoted evidence is never
+translated. CLI/hook messages and generated indexes default to Russian.
+Canonical field names stay ASCII, with EN/RU parsing aliases.
+
+## Limits
+
+Kanon checks completeness against the written checklist. It cannot judge taste,
+prove that a task was decomposed correctly or authenticate evidence. A closed
+checklist does not replace code review or human acceptance.
 
 ## Documentation
 
-| Document | What is in it |
-|---|---|
-| [`SPEC/FORMAT.md`](SPEC/FORMAT.md) | normative file format, states, lifetime ([ru](SPEC/FORMAT.ru.md)) |
-| [`docs/CONCEPTS.md`](docs/CONCEPTS.md) | why it is built this way — harness, guides and sensors, proof over ticks ([ru](docs/CONCEPTS.ru.md)) |
-| [`docs/INSTALL.md`](docs/INSTALL.md) | installation for both hosts, what the hooks do ([ru](docs/INSTALL.ru.md)) |
-| [`skills/task-to-checklist/SKILL.md`](skills/task-to-checklist/SKILL.md) | the behaviour itself |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | versioning, CI, how to change things |
+- [Installation](docs/INSTALL.md) · [Concepts](docs/CONCEPTS.md) · [Cleanup](docs/CLEANUP.md)
+- [Checklist format](SPEC/FORMAT.md) · [Retirement contract](SPEC/RETIREMENT.md)
+- [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Backlog](BACKLOG.md)
+- [Road to 1.0](docs/RELEASE.md)
 
-## Related
-
-- [mnemo](https://github.com/ZenonEl/mnemo) — a citable archive of client
-  material and requirements. Optional one-way link: a checklist item may carry a
-  requirement id, and closing it yields ready evidence for that requirement.
-- [ephemeris](https://github.com/ZenonEl/ephemeris) — issue-based daily handoffs
-  between sessions.
-
-Kanon is self-contained and requires neither of them.
+Optional neighbors: [mnemo](https://github.com/ZenonEl/mnemo) stores source
+material and requirements; [ephemeris](https://github.com/ZenonEl/ephemeris)
+passes work between sessions through daily issues. Kanon requires neither.
 
 ## Licenses
 
-| Path | License |
+| Paths | License |
 |---|---|
-| `SPEC/`, `docs/` — text | [CC BY-SA 4.0](SPEC/LICENSE) |
-| everything else — skills, commands, scripts | [AGPL-3.0-or-later](LICENSE) |
+| `SPEC/`, `docs/`, `CONTRIBUTING*.md` | [CC BY-SA 4.0](SPEC/LICENSE) |
+| Other paths, including skills, commands, scripts, tests and root README files | [AGPL-3.0-or-later](LICENSE) |
+
+Standard license texts are kept verbatim. The plugin manifest's license field
+names the code license; the table above describes the repository's split.

@@ -15,19 +15,22 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Версии согласованы во всех манифестах и описаны в CHANGELOG
+      - name: Verify manifest versions and changelogs
         run: python3 scripts/check-versions.py
 
-      - name: Скилы и команды пригодны к маршрутизации
+      - name: Validate skill and command metadata
         run: python3 scripts/check-skills.py
 
-      - name: Самопроверка линтера, sweep и хуков
+      - name: Check documentation languages and links
+        run: python3 scripts/check-docs.py
+
+      - name: Test linter, lifecycle and hooks
         run: bash tests/selftest.sh
 
-      - name: Мутации — тесты умеют краснеть
+      - name: Verify mutation coverage
         run: python3 tests/mutate.py
 
-      - name: Манифесты — валидный JSON
+      - name: Validate JSON manifests
         run: |
           for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json \
                    .agents/plugins/marketplace.json .codex-plugin/plugin.json \
@@ -36,12 +39,12 @@ jobs:
             echo "ok  $f"
           done
 
-      - name: Зеркала маркетплейса совпадают
+      - name: Compare marketplace mirrors
         run: |
           diff .claude-plugin/marketplace.json .agents/plugins/marketplace.json \
             && echo "ok  зеркала совпадают"
 
-      - name: В коммиты не уехали рабочие чеклисты
+      - name: Reject tracked working checklists
         run: |
           if git ls-files | grep -qE '(^|/)(_kanon|\.kanon)/'; then
             echo "ОШИБКА: каталог чеклистов под версионным контролем — это рабочие файлы"

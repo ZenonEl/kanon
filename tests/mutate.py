@@ -1,24 +1,8 @@
 #!/usr/bin/env python3
-"""Мутационный прогон: снять защиту и убедиться, что самотест краснеет.
+"""Remove known defenses and require the selftest to fail.
 
-Зачем отдельный инструмент. Мутации, набранные в командной строке, дважды
-оказывались холостыми: шаблон не совпадал с файлом, замена не применялась, а
-прогон печатал «тесты покраснели» или «пробел» — то есть врал в обе стороны.
-Поэтому здесь замена **проверяется**: если файл не изменился, это ошибка стенда,
-а не результат.
-
-Второе. Набор мутаций, придуманный автором кода, систематически состоит из тех
-поломок, которые тесты умеют ловить. Поэтому набор ниже собран из откатов
-конкретных находок ревью, а не из того, что показалось интересным.
-
-Чего здесь нет намеренно. Уборка временного файла индекса достижима только при
-отказе подмены, а отказ теперь наступает раньше — на опознании чужого индекса.
-Оставить мутацию значило бы держать вечный «пробел» и приучить его пропускать.
-
-Usage:
-    tests/mutate.py            # весь набор
-    tests/mutate.py <часть-имени>
-"""
+Reject unchanged replacements as bench errors. This protects known paths,
+not every hostile input representation. Usage: mutate.py [name-fragment]."""
 from __future__ import annotations
 
 import pathlib
@@ -29,7 +13,7 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
-# (имя, файл, что заменить, на что) — каждая строка снимает одну защиту.
+# Each replacement removes one defense: name, path, original snippet, replacement.
 MUTATIONS: list[tuple[str, str, str, str]] = [
     ("чужой-индекс-переписывается", "scripts/sweep.py",
      "    if not owns_index(target):", "    if False:"),
@@ -59,7 +43,7 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
      'bare = value.split("·")[0].strip(" .!·").lower()',
      'bare = value.strip(" .!·").lower()'),
     ("пустой-буллет-материал", "scripts/kanon_format.py",
-     "            if entry:  # пустой буллет материалом не является", "            if True:"),
+     "            if entry:  # empty bullets are not gathered material", "            if True:"),
     ("нечитаемый-провал-тонет", "scripts/kanon_format.py",
      '            elif stripped.startswith("[!]"):', "            elif False:"),
     ("stale-с-третьим-условием", "scripts/kanon_format.py",
@@ -125,17 +109,35 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
      '        targets = [""]'),
     ("session-start-онемел", "hooks/kanon-hook.py",
      '    return _run("sweep.py", "--quiet")', '    return ""'),
+    ("архив-потерял-исходник", "scripts/retire.py",
+     "payload = data + MARKER", "payload = b'' + MARKER"),
+    ("архив-не-убран-из-активного", "scripts/retire.py",
+     "                    remove_source(base_fd, path.name, data, info)", "                    pass"),
+    ("архив-без-следа-удаления", "scripts/retire.py",
+     "                append_trail(archive_fd, data, doc, record, args.evidence_in)", "                pass"),
+    ("архив-ложное-завершение", "scripts/retire.py",
+     '        if args.disposition == "completed":', "        if False:"),
+    ("архив-без-адреса-доказательств", "scripts/retire.py",
+     '            if any(item.has_proof for item in doc.items) and not args.evidence_in.strip():', "            if False:"),
+    ("архив-без-проверки-хеша", "scripts/retire.py",
+     '    if digest(original) != record.get("original_sha256"):', "    if False:"),
+    ("архив-теряет-маркеры-пунктов", "scripts/retire.py",
+     "        lines.append(source_lines[item.line - 1])",
+     '        lines.append(f"- {item.number}. {item.text}")'),
+    ("архив-не-читает-crlf", "scripts/kanon_format.py",
+     '    text = text.replace("\\r\\n", "\\n").replace("\\r", "\\n")',
+     '    text = text'),
 ]
 
 
 def run_one(name: str, rel: str, old: str, new: str) -> str:
     with tempfile.TemporaryDirectory() as tmp:
         work = pathlib.Path(tmp) / "repo"
-        shutil.copytree(ROOT, work, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+        shutil.copytree(ROOT, work, ignore=shutil.ignore_patterns(".git", "__pycache__", "_kanon", ".kanon", "reviews"))
         target = work / rel
         before = target.read_text(encoding="utf-8")
         if old not in before:
-            # Мутация не применилась: это ошибка стенда, а не свойство тестов.
+            # An unchanged target means a broken mutation bench, not a test outcome.
             return "СТЕНД"
         target.write_text(before.replace(old, new, 1), encoding="utf-8")
         result = subprocess.run(["bash", "tests/selftest.sh"], cwd=work,

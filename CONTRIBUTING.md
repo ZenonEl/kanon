@@ -1,130 +1,90 @@
-# Как вносить правки
+# Contributing
 
-**Лицензия:** CC BY-SA 4.0
+**License:** [CC BY-SA 4.0](SPEC/LICENSE) · [Русский](CONTRIBUTING.ru.md)
 
-## Источник истины
+## Source of truth
 
-- **`SPEC/FORMAT.md` — источник истины о формате.** Расхождение поведения скила
-  или скрипта с текстом спеки — дефект инструмента, а не повод переписать спеку.
-- `docs/CONCEPTS.md` объясняет, почему формат такой. Он не нормативный: спорить
-  с ним можно, менять формат из-за него — нет.
-- Скил и команды — потребители формата.
+`SPEC/FORMAT.md` defines the checklist; `SPEC/RETIREMENT.md` defines cleanup.
+Skills, commands and scripts consume those contracts. A mismatch is a tool bug,
+not a reason to quietly weaken the contract. Concepts explain the choices.
 
-## Версионирование
+## Language and licenses
 
-SemVer. Номер живёт в **шести** местах, и все шесть обязаны совпадать:
+Agent instructions, code comments/docstrings and normative contracts are English.
+Human guides have English primary and Russian translations. Checklist prose and
+agent conversation follow the user's language; quoted evidence stays verbatim.
+Runtime messages and generated indexes default to Russian. Keep EN/RU aliases
+and canonical ASCII fields stable.
 
+`SPEC/`, `docs/` and `CONTRIBUTING*.md` use CC BY-SA 4.0. Other paths use
+AGPL-3.0-or-later, including root README files and the agent instructions.
+Standard license texts must remain verbatim. Do not silently relicense a file
+when moving or translating it; keep README license tables consistent.
+
+## Versions
+
+The plugin version appears in six places:
+
+```text
+.claude-plugin/plugin.json
+.claude-plugin/marketplace.json
+.agents/plugins/marketplace.json
+.codex-plugin/plugin.json
+README.md
+README.ru.md
 ```
-.claude-plugin/plugin.json           version
-.claude-plugin/marketplace.json      plugins[0].version
-.agents/plugins/marketplace.json     plugins[0].version   (зеркало предыдущего)
-.codex-plugin/plugin.json            version
-README.md                            бейдж version-X.Y.Z
-README.ru.md                         бейдж version-X.Y.Z
-```
 
-Почему это проверяется машиной: **оба хоста при обновлении сравнивают только
-номер версии.** Отставший манифест означает, что правка не доедет до
-установленных копий, а команда обновления отрапортует, что всё уже свежее.
-Расхождение тихое — самый дорогой вид.
+All must agree, and both changelogs must have the release entry. Hosts use the
+version when updating: a stale manifest can prevent changed behavior reaching an
+installed copy. SemVer: patch for compatible corrections; minor for additive
+commands/fields; major for incompatible changes requiring migration.
 
-Что считать чем:
+The format version is independent. Bump it only when the format contract changes.
+Marketplace mirrors must remain byte-identical.
 
-| Уровень | Когда |
-|---|---|
-| **patch** | уточнение формулировок, правка опечаток, ничего в поведении |
-| **minor** | новое необязательное поле формата, новая команда, расширенные триггеры; старые чеклисты остаются валидными |
-| **major** | изменение или удаление поля формата; старые чеклисты требуют миграции |
+## Change process
 
-Отдельно от версии плагина живёт **версия формата** в заголовке
-`SPEC/FORMAT.md`. Она поднимается только когда меняется сам формат файла, и не
-обязана совпадать с версией плагина.
+1. State the observable result and proof for the change.
+2. Update the relevant contract before implementation if behavior changes.
+3. Add a regression that reproduces the failure or tests the new user outcome.
+4. Implement a small complete change; keep behavior and presentation edits separable.
+5. Synchronize both human-documentation versions, plugin versions and changelog.
+6. Run the checks below and inspect the diff before committing.
 
-Каждый бамп обязан нести запись `## X.Y.Z` в `CHANGELOG.md`. Версия без
-описания изменений для потребителя равна её отсутствию — это проверяется
-машиной.
-
-## Порядок правки
-
-1. Меняешь поведение — сначала правишь `SPEC/FORMAT.md`, потом скил.
-2. Бампаешь версию во всех шести местах.
-3. Дописываешь `CHANGELOG.md`.
-4. Прогоняешь проверки:
-
-```
+```bash
 python3 scripts/check-versions.py
 python3 scripts/check-skills.py
+python3 scripts/check-docs.py
 bash tests/selftest.sh
-```
-
-5. Зеркала маркетплейса обязаны совпадать побайтно:
-
-```
+python3 tests/mutate.py
 diff .claude-plugin/marketplace.json .agents/plugins/marketplace.json
+git diff --check
 ```
 
-CI прогоняет всё это же плюс валидность JSON и отсутствие `_kanon/` под
-версионным контролем.
+The selftest includes parser, hook, lifetime and retirement cases. Mutation tests
+must prove their replacement actually happened; an unchanged target is a broken
+bench, not a passing test. Mutations cover known regressions and do not replace
+adversarial inputs or an independent review.
 
-## Что не уходит в коммиты
+## Working data
 
-Жёсткое правило: **в репозиторий не попадает ничего рабочего или личного.**
+Never commit `_kanon/`, `.kanon/`, archives/logs, source transcripts, private
+review reports, client names, credentials, internal service addresses or personal
+filesystem paths. Use synthetic examples. Check the current tree and reachable
+history before making a repository public; changing HEAD does not remove history.
+Publishing and history transformations require explicit owner authorization.
 
-- `_kanon/` — рабочие чеклисты. В `.gitignore`, отдельно проверяется в CI.
-- Разборы реальных случаев, переписка, имена людей и клиентов, названия
-  проектов заказчиков. Примеры в документации — обобщённые: описывается класс
-  отказа, а не инцидент.
-- Пути вида `/home/<имя>/…`, токены, ключи, адреса внутренних сервисов.
+## Hook and filesystem rules
 
-Причина не только приватность. Обобщённый пример полезнее конкретного: читателю
-нужен узнаваемый класс, а не чужая история.
+Hooks never block. Internal hook errors exit zero. PreToolUse reminds once per
+session; preserve the gathering threshold. Archiving is explicit and does not
+complete open items. Age never authorizes deletion. File operations must preserve
+recoverable content, refuse links and destination collisions, and save disposal
+history before removing the container.
 
-## Язык
+## Routing
 
-Репозиторий двуязычный, и это не косметика: формат обязан разбираться линтером
-независимо от языка автора.
-
-- **Нормативные документы и код — на английском.** `SPEC/FORMAT.md`,
-  `docs/CONCEPTS.md`, `docs/INSTALL.md`, тело скила, команды. Русские версии
-  лежат рядом с суффиксом `.ru.md` и при расхождении неверны они.
-- **Машинные ключи — фиксированный ASCII** (`check:`, `proof:`, `tried:`,
-  `returned:`, `[no check]`, названия разделов). Человеческие подписи свободны.
-- **Новый язык добавляется строкой в таблицу псевдонимов** в
-  `scripts/kanon_format.py` и в обе редакции `SPEC/FORMAT*.md`. Канонический ключ
-  при этом не меняется никогда: смена ключа сломала бы чужие чеклисты.
-- Заставлять человека писать на чужом языке ради парсера — проблема парсера.
-
-## Хуки
-
-Три правила, нарушать которые дорого:
-
-1. **Ничего не блокируется.** Хук, мешающий работать, выключают вместе с
-   плагином.
-2. **Хук не падает.** Любая ошибка внутри — выход 0 и тишина: сломанный хук
-   ломает чужую работу, а не свою.
-3. **Напоминание говорит один раз за сессию.** Шум перестают читать.
-
-Проверяются самотестом на пустом входе и на мусоре.
-
-## Стиль скила
-
-Требования, выведенные из практики и нарушать которые дорого:
-
-1. **Описание — единственное, что читает маршрутизация.** Тело скила при выборе
-   не читается вовсе. Триггерные фразы должны стоять в `description` дословно,
-   на языке, которым говорит пользователь.
-2. **Порог обязателен.** Скил, срабатывающий на мелочи, выключают на второй
-   день. Условия молчания описываются так же явно, как условия запуска.
-3. **Не пересказывать то, что говорит команда.** Пересказ заводит вторую
-   редакцию правила, которая разойдётся с кодом на первой же правке.
-4. **Границы применимости — обязательный раздел.** Инструмент, обещающий
-   больше, чем проверяет, вреден сильнее отсутствующего.
-
-## Проверка маршрутизации
-
-`scripts/check-skills.py` видит только форму: файл, frontmatter, обязательные
-поля, длину описания. Срабатывает ли скил на живой фразе, она не знает.
-
-Это меряется прогоном: `claude plugin eval` с baseline-плечом без плагина —
-фраза на входе, ожидание «скил поднялся», сравнение с прогоном без плагина.
-Каталога `evals/` пока нет, он в бэклоге.
+`check-skills.py` checks placement and metadata shape, not automatic selection.
+Record actual input, host/plugin version and whether invocation was natural,
+manual or prompted by a hook. K7 is an evaluation with a comparable no-plugin
+run. Do not assume access to a particular host's evaluation feature.

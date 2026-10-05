@@ -1,16 +1,8 @@
 #!/usr/bin/env python3
-"""Разбор формата чеклиста. Общий модуль для линтера, приёмки и хуков.
+"""Shared checklist parser for linting, acceptance and hooks.
 
-Формат описан в SPEC/FORMAT.md и является источником истины. Машинные ключи —
-фиксированный ASCII, человеческие подписи свободны: чеклист пишется на языке
-автора, а разбирается одинаково. Новый язык добавляется строкой в таблицу
-псевдонимов, канонический ключ при этом не меняется.
-
-The format is described in SPEC/FORMAT.md, which is the source of truth. Machine
-tokens are fixed ASCII, human labels are free: a checklist is written in its
-author's language and parsed the same way regardless. A new language is added by
-extending the alias table; canonical keys never change.
-"""
+SPEC/FORMAT.md is normative. Canonical fields are ASCII; EN/RU aliases remain
+accepted so that human prose and quoted evidence can use their own languages."""
 from __future__ import annotations
 
 import datetime as _dt
@@ -19,9 +11,7 @@ import pathlib
 import re
 from dataclasses import dataclass, field
 
-# Каталог виден, а не спрятан: инструмент, который прячет свои файлы, прячет и
-# недостачу, ради показа которой заведён. Подчёркивание — как у соседних
-# инструментов, сортируется наверх.
+# Keep the directory visible; the underscore sorts working checklists near the top.
 #
 # The directory is visible, not hidden: a tool that hides its own files hides
 # the shortfall it exists to show.
@@ -29,7 +19,7 @@ CHECKLIST_DIR = "_kanon"
 LEGACY_DIRS = (".kanon",)
 INDEX_NAME = "INDEX.md"
 
-# --- псевдонимы / aliases -------------------------------------------------
+# --- aliases -------------------------------------------------------------
 
 SECTIONS: dict[str, tuple[str, ...]] = {
     "gathered": ("gathered", "собрано", "из собранного"),
@@ -48,34 +38,25 @@ FIELD_ALIASES: dict[str, tuple[str, ...]] = {
 
 NO_CHECK = ("[no check]", "[без проверки]")
 
-# Пустые утверждения, выдаваемые за доказательство. Список принципиально
-# неполон: машина ловит самые ленивые случаи, отличить отчёт от «подтверждено:
-# сделано» может только человек.
+# The stop list detects empty affirmations; readers judge actual proof quality.
 EMPTY_PROOF = {
     "done", "ok", "okay", "works", "working", "checked", "fixed", "yes", "good",
     "готово", "сделано", "работает", "проверил", "проверено", "исправлено", "да",
 }
-# Порога длины здесь НЕТ намеренно. Он был и отвергал «h.png» и «#482» —
-# путь к скриншоту и ссылку на задачу, которые спека перечисляет как валидные
-# доказательства. Спека — источник истины, критерий в ней один: стоп-лист.
+# No minimum length: a short screenshot path or issue number is valid proof.
 
 _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 _HEADING = re.compile(r"^##\s+(.+?)\s*$")
-# Длина числа ограничена намеренно: `int()` на строке из тысяч цифр бросает
-# ValueError и уносил разбор всего каталога раньше, чем сосед попадал в отчёт.
-# Не подошедшая под шаблон строка не исчезает — она попадает в malformed.
+# Bound numeric fields to prevent ValueError from hiding neighboring files; malformed lines remain visible.
 _ITEM = re.compile(r"^-\s*\[([ xX])\]\s*(\d{1,6})\.\s*(.*)$")
 _FAILURE = re.compile(r"^\[!\]\s*(\d{1,6})\s*·?\s*(.*)$")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def valid_date(value: str) -> bool:
-    """Дата, а не строка, похожая на дату.
+    """Validate a real calendar date, not just its shape.
 
-    Проверки формы мало: `2026-99-99` ей удовлетворяет, проходит линтер, а потом
-    роняет sweep на fromisoformat — и хук, глотающий исключение, теряет весь
-    отчёт вместе с ним.
-    """
+    An impossible date would otherwise crash lifetime calculation and silence a hook."""
     if not _DATE.match(value or ""):
         return False
     try:
@@ -88,14 +69,9 @@ _FIELD_LOOKUP = {a: key for key, aliases in FIELD_ALIASES.items() for a in alias
 
 
 def _section_of(heading: str) -> str:
-    """Какой раздел назван заголовком.
+    """Match the earliest section alias contained in a heading.
 
-    По вхождению, а не по равенству: двуязычные заголовки вида
-    «## Приёмка / Acceptance» естественны в этом репозитории, а точное сравнение
-    их не узнавало — и весь блок пунктов молча выпадал из разбора.
-    Побеждает псевдоним, встретившийся раньше: заголовок разбирается
-    детерминированно.
-    """
+    Containment accepts bilingual headings instead of silently losing their items."""
     low = heading.strip().lower()
     best, at = "", len(low) + 1
     for key, aliases in SECTIONS.items():
@@ -117,13 +93,9 @@ class Item:
 
     @property
     def has_proof(self) -> bool:
-        """Доказательство есть, если первый его сегмент — не пустое утверждение.
+        """Accept proof whose first segment is not an empty affirmation.
 
-        Проверять склеенную строку целиком нельзя: склейка сегментов сделала
-        `подтв: готово · 2026-09-02` непохожим на «готово», и любой хвост —
-        например дата, которую приписать естественно, — снимал стоп-лист.
-        Сравнивается то, что человек написал ответом на «чем докажешь».
-        """
+        Checking the joined value would let an appended date bypass the stop list."""
         value = self.fields.get("proof", "").strip()
         if not value:
             return False
@@ -150,7 +122,7 @@ class Checklist:
     had_acceptance_section: bool = False
     malformed: list[tuple[int, str]] = field(default_factory=list)
 
-    # --- выведенное состояние / derived state ---
+    # --- derived state -------------------------------------------------------
 
     @property
     def closed_on(self) -> str:
@@ -162,10 +134,7 @@ class Checklist:
         if self.closed_on:
             return "closed"
         try:
-            # Условия ровно два, как в спеке. Третьего («есть открытые пункты»)
-            # тут стояло, и из-за него чеклист, где всё доказано, а `closed:` не
-            # проставлен, никогда не всплывал — то есть ровно тот случай, когда
-            # доказательства никуда не переехали, а тара не закрыта.
+            # Age and an empty closed date define stale, even if every item already has proof.
             age = _dt.date.today() - _dt.date.fromtimestamp(self.path.stat().st_mtime)
             if age.days >= 14:
                 return "stale"
@@ -191,7 +160,7 @@ class Checklist:
 
     @property
     def expires_in(self) -> int | None:
-        """Дней до истечения тары. None — не истекает."""
+        """Return days until closed-container review; None means no expiry."""
         if not valid_date(self.closed_on):
             return None
         closed = _dt.date.fromisoformat(self.closed_on)
@@ -199,15 +168,10 @@ class Checklist:
 
 
 def _split_fields(tail: str) -> tuple[str, dict[str, str], bool]:
-    """Разобрать хвост строки пункта на текст, поля и метку «без проверки».
+    """Split item text, fields and the standalone no-check marker.
 
-    Сегмент без ключа НЕ отбрасывается, а приклеивается обратно к предыдущему
-    полю (или к тексту). Иначе точка внутри доказательства обрезала бы его
-    молча — а обрезанное доказательство линтер объявлял бы отсутствующим.
-
-    Метка «без проверки» опознаётся только как отдельный сегмент: иначе пункт
-    «описать соглашение [no check]» объявлялся бы непроверяемым.
-    """
+    Unkeyed segments attach to the preceding field or text: a separator inside proof
+    must not silently truncate it. A marker embedded in prose is not a field."""
     segments = [s.strip() for s in tail.split("·")]
     no_check = False
     kept: list[str] = []
@@ -234,16 +198,10 @@ def _split_fields(tail: str) -> tuple[str, dict[str, str], bool]:
 
 
 def open_checklist(path: pathlib.Path) -> str:
-    """Прочитать чеклист, привязав решение о ссылке к открытому файлу.
+    """Bind link validation to the opened file.
 
-    Проверка `is_symlink()` при обходе каталога и последующее открытие по имени
-    — разные операции: между ними файл можно подменить символической ссылкой, и
-    чтение уйдёт наружу. `O_NOFOLLOW` решает это в момент открытия.
-
-    Жёсткая ссылка символической не является и по имени неотличима, поэтому
-    отдельно отказываемся от файла с несколькими именами: чеклист — рабочий
-    файл, второе имя у него берётся не просто так.
-    """
+    O_NOFOLLOW refuses a symlink at open time; fstat refuses hard-linked files.
+    A discovery-time pathname check alone would leave a check/use race."""
     fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     try:
         if os.fstat(fd).st_nlink > 1:
@@ -260,6 +218,12 @@ def open_checklist(path: pathlib.Path) -> str:
 
 def parse(path: pathlib.Path) -> Checklist:
     text = open_checklist(path)
+    return parse_text(path, text)
+
+
+def parse_text(path: pathlib.Path, text: str) -> Checklist:
+    """Parse a previously opened snapshot without reopening its pathname."""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     doc = Checklist(path=path)
 
     m = _FRONTMATTER.match(text)
@@ -286,7 +250,7 @@ def parse(path: pathlib.Path) -> Checklist:
 
         if section == "gathered" and raw.strip().startswith("-"):
             entry = raw.strip()[1:].strip()
-            if entry:  # пустой буллет материалом не является
+            if entry:  # empty bullets are not gathered material
                 doc.gathered.append(entry)
             continue
 
@@ -294,8 +258,7 @@ def parse(path: pathlib.Path) -> Checklist:
             stripped = raw.strip()
             item = _ITEM.match(stripped)
             if not item and stripped.startswith("- ["):
-                # Строка выглядит пунктом, но не разобралась. Молча пропустить
-                # её нельзя: пункт исчезнет из приёмки, а линтер напечатает «ok».
+                # An item-shaped line must not disappear when parsing fails.
                 doc.malformed.append((n, stripped))
             if item:
                 body, fields, no_check = _split_fields(item.group(3))
@@ -313,10 +276,7 @@ def parse(path: pathlib.Path) -> Checklist:
             stripped = raw.strip()
             fail = _FAILURE.match(stripped)
             if fail:
-                # Дату снимаем с хвоста ДО разбора полей: она стоит последним
-                # сегментом без ключа, и склейка приписала бы её к последнему
-                # полю — какому именно, зависит от порядка, так что проверить
-                # её было бы нечем.
+                # Extract the failure date before unkeyed segments attach to the preceding field.
                 tail, stamp = fail.group(2), ""
                 head, sep, last = tail.rpartition("·")
                 if sep and _DATE.match(last.strip()):
@@ -325,20 +285,14 @@ def parse(path: pathlib.Path) -> Checklist:
                 fields["date"] = stamp
                 doc.failures.append((int(fail.group(1)), fields))
             elif stripped.startswith("[!]"):
-                # Строка выглядит записью провала и не разобралась: пропустить
-                # её молча значит потерять след попытки, ради которого раздел
-                # и существует.
+                # Preserve malformed failure lines instead of losing the attempt history.
                 doc.malformed.append((n, stripped))
 
     return doc
 
 
 def directory(root: pathlib.Path | None = None) -> pathlib.Path | None:
-    """Каталог чеклистов. Опознаётся по имени, но имя — рекомендация.
-
-    KANON_DIR переопределяет. Исторические имена принимаются: проверка, чьи
-    предупреждения учатся пропускать, хуже отсутствующей.
-    """
+    """Find the active directory, honoring KANON_DIR and the legacy name."""
     root = root or pathlib.Path.cwd()
     override = os.environ.get("KANON_DIR")
     if override:
@@ -353,14 +307,9 @@ def directory(root: pathlib.Path | None = None) -> pathlib.Path | None:
 
 
 def find(root: pathlib.Path | None = None) -> tuple[list[pathlib.Path], list[pathlib.Path]]:
-    """Чеклисты и отдельно — пропущенные симлинки.
+    """Discover active files shallowly and report skipped symlinks.
 
-    Симлинк в каталоге чеклистов не читается. Хуки запускаются автоматически в
-    любом каталоге, куда зашла сессия, а `read_text` идёт по ссылке: подложенный
-    `link.md` на файл вне проекта выдал бы его содержимое в чужую сессию.
-    Пропуск не молчаливый — пропущенные возвращаются отдельным списком и
-    показываются.
-    """
+    Archived files live in a subdirectory and never become active reminders."""
     folder = directory(root)
     if folder is None:
         return [], []
