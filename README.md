@@ -1,4 +1,4 @@
-# kanon
+# <img src="assets/brand/kanon-logo.png" width="64" height="64" alt=""> kanon
 
 [![Version](https://img.shields.io/badge/version-0.13.0-blue.svg)](CHANGELOG.md)
 [![CI](https://github.com/ZenonEl/kanon/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ZenonEl/kanon/actions/workflows/ci.yml)
@@ -14,6 +14,8 @@ session or a different agent.
 
 It is a plugin for Claude Code and Codex, with a small Python CLI. The name comes
 from Greek κανών, a carpenter's measuring rod.
+
+![Kanon: research, questions and constraints become acceptance criteria before work starts.](assets/brand/kanon-social-preview.png)
 
 ## Why
 
