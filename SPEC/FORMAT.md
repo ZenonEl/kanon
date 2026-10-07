@@ -1,6 +1,6 @@
 # Checklist format
 
-**Format version:** 0.6
+**Format version:** 0.7
 **Status:** normative. The single source of truth about the file.
 **License:** CC BY-SA 4.0 (see [`LICENSE`](LICENSE))
 
@@ -55,7 +55,8 @@ Frontmatter keys are always canonical ASCII and are never translated.
 ```
 _kanon/
 ├── INDEX.md                  derived — rebuilt by sweep.py, never hand-written
-└── <YYYY-MM-DD>-<slug>.md    one checklist per task
+├── <YYYY-MM-DD>-<slug>.md    one active checklist per task
+└── archive/                 inactive checklists and their decision trail
 ```
 
 `_kanon/` sits in the working project root and goes into its `.gitignore` — or,
@@ -160,8 +161,8 @@ date and the file's content can be checked.
 | State | Lifetime |
 |---|---|
 | `open` | never expires |
-| `closed` | 7 days from the `closed` date, then dropped |
-| `stale` | **never dropped; surfaced** with its open items listed |
+| `closed` | review after 7 days from the `closed` date; no automatic deletion |
+| `stale` | surfaced with its open items; continue or explicitly retire |
 
 The principle: **the container expires, the content does not.** By expiry
 everything valuable must live somewhere else — in a commit, in a requirement, in
@@ -170,11 +171,16 @@ a findings log.
 Expiry doubles as a check: a file you are reluctant to delete means the proof
 never moved anywhere, which means the work is not closed.
 
-Three outcomes:
+Inactive work can leave the active list without pretending to be complete.
+[`RETIREMENT.md`](RETIREMENT.md) defines explicit archive, restore and purge.
+Archived decisions are `deferred`, `cancelled`, `superseded` or `completed`.
+Archive preserves all original items, proof and failures; outstanding items
+remain outstanding. A deferred task needs an address and condition for continuing.
 
-1. `drop` — delete (the default for `closed`);
-2. `extract` — move the proof somewhere long-lived, delete the container;
-3. `keep` — preserve whole (rare; the checklist became a document).
+Discovery is shallow: `archive/` never contributes to active acceptance counts
+or Stop reminders. The index links to it. A manual report suggests review after
+30 days in the archive; nothing expires automatically. Permanent deletion saves
+a disposition trail and requires evidence and remaining work to survive elsewhere.
 
 ## Optional link to a requirements registry
 

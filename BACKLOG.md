@@ -1,50 +1,34 @@
-# Бэклог
+# Backlog
 
-Рабочий документ. Не нормативный. Нумерация K-пунктов та же, что в дейликах.
+[Русский](BACKLOG.ru.md). Working document, not a normative specification.
 
-## Обкатка (K6)
+## Next
 
-Главный открытый вопрос: **срабатывает ли скил сам.** Пороги назначены до
-данных: одно срабатывание без слов из триггеров за неделю — дорога работает;
-три промаха при десяти поводах — чинить описание; ноль чеклистов и ноль
-промахов за две недели — момент перехода не наступает так, как предположено.
+The [1.0 candidate plan](docs/RELEASE.md) sets a week of observations and release
+criteria. A date alone does not establish readiness.
 
-Журнал промахов, дословно и до того, как посмотрен результат:
+- [ ] K6 — observe automatic skill selection in ordinary work. Record versions
+      and distinguish selection from a hook reminder or manual invocation.
+- [ ] K7 — reproducible routing cases with a comparable no-plugin run.
+      Structural metadata validation does not measure selection.
 
-| Дата | Повод | Что было |
-|---|---|---|
-| 2026-09-03 | «Начинаю. Работаю в отдельном worktree, в общем дереве сидят другие сессии» | скил не поднялся, `/kanon:open` позван руками после прерывания. Хуки молчали: работа шла через Bash, сенсор считал только имена инструментов — починено в 0.10.0 |
-| 2026-09-03 | конец сессии при 13/15 закрытых | **срабатывание**: `Stop` перечислил два открытых пункта, сессия вместо «сделано» перечислила недостачу. Первое подтверждение, что `systemMessage` доходит в живой сессии |
-| 2026-09-03 | сессия Codex, чеклист на 22 пункта, 0/22 | **срабатывание `Stop` под Codex** — при том, что доки обещали отсутствие хуков там. Живой замер: провод совместим, `transcript_path` пуст → сбор считался нулём, починено в 0.11.0. Поднялся ли скил сам или позван — из выдержки не видно |
+## Later
 
-## Ближайшее
+- [ ] K8 — transfer an item's proof to the mnemo requirement registry in one
+      command. Kanon remains independent of that registry.
 
-- [ ] K7 — `evals/` с baseline-плечом: фраза на входе → ожидание «поднялся
-      `task-to-checklist`». `claude plugin eval` в раннем доступе; кейсы
-      готовы, мерить нечем.
-- [ ] K9 — хук на первый `Write` после серии чтений **без** порога сбора —
-      только если K6 покажет, что скил сам не поднимается. Начинать с него
-      нельзя: агрессивен на мелких правках.
-- [ ] `docs/CONCEPTS.ru.md` и `docs/INSTALL.ru.md` отстают от английских: в
-      русском CONCEPTS нет раздела про хуки, в INSTALL — таблицы событий.
+## Shipped
 
-## Потом
+- [x] Explicit retirement: archive deferred, cancelled, superseded or completed
+      work; restore original bytes; save a trail before purge. See 0.13.0.
+- [x] EN-primary/RU human documentation, English agent/code instructions,
+      English runtime messages and documentation consistency checks. See 0.13.0.
 
-- [ ] Заметка для mnemo `work-state`, заслон на блокер: вопроса «пробовал ли
-      сам» мало. Случай 2026-09-03: пробовал, получилось, и именно поэтому не
-      копал. Нужен второй вопрос — «получилось потому, что понял, или потому,
-      что убрал». Править там, не здесь.
+## Constraints
 
-- [ ] K8 — привязка к mnemo в коде: вытащить `подтв:` в `req --evidence`
-      одной командой.
-- [ ] `README.ru.md` и `README.md` разъезжаются вручную — проверить в CI, что
-      разделы совпадают по структуре.
-
-## Заметки
-
-- **Внести в CV / портфолио.** Кейс сам по себе интересный: диагностика через
-  харнес-слои (guides против sensors), инструмент выведен из разбора реального
-  класса отказов, а не из «хорошо бы иметь чеклисты». Отдельно стоит упомянуть
-  связку из трёх инструментов — приём материала, передача смены, приёмка работы.
-  Держу здесь, а не в README: README уйдёт в публику, и заметка себе там будет
-  выглядеть странно.
+- K9 — the more aggressive hook without a gathering threshold is retired.
+      Existing hooks remain nonblocking; reminder frequency is unchanged.
+- Archiving unfinished work does not complete it. File age alone never
+      authorizes deletion.
+- Public preparation does not authorize publishing, repository visibility
+      changes or history rewriting.

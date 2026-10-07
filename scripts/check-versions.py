@@ -1,15 +1,8 @@
 #!/usr/bin/env python3
-"""Сверить номер версии во всех местах, где он записан.
+"""Check plugin versions in four manifests and two README badges.
 
-Манифестов четыре — Claude Code, его маркетплейс, зеркало маркетплейса для
-Codex-совместимых хостов и сам Codex, — плюс бейджи в двух README. Оба хоста при
-обновлении сравнивают ТОЛЬКО номер версии: отставший манифест означает, что
-правка не доедет до установленных копий, а команда обновления отрапортует, что
-всё уже свежее. Расхождение тихое, поэтому проверка машинная.
-
-Заодно проверяется, что версия описана в CHANGELOG: версия без записи о том, что
-в ней изменилось, для потребителя равна её отсутствию.
-"""
+Hosts compare the version when updating, so a stale manifest prevents delivery.
+Each release also requires a matching CHANGELOG entry."""
 import json
 import pathlib
 import re
@@ -22,7 +15,7 @@ SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 def read(path, get):
     p = ROOT / path
     if not p.exists():
-        return path, None, "файла нет"
+        return path, None, "file missing"
     try:
         return path, get(json.loads(p.read_text(encoding="utf-8"))), None
     except Exception as exc:  # noqa: BLE001
@@ -32,9 +25,9 @@ def read(path, get):
 def badge(path):
     p = ROOT / path
     if not p.exists():
-        return path, None, "файла нет"
+        return path, None, "file missing"
     m = re.search(r"badge/version-([0-9]+\.[0-9]+\.[0-9]+)-", p.read_text(encoding="utf-8"))
-    return path, (m.group(1) if m else None), (None if m else "бейдж версии не найден")
+    return path, (m.group(1) if m else None), (None if m else "version badge not found")
 
 
 found = [
@@ -52,7 +45,7 @@ broken = False
 
 for path, version, err in found:
     if err:
-        print(f"  {path:<{width}}  ОШИБКА: {err}")
+        print(f"  {path:<{width}}  ERROR: {err}")
         broken = True
         continue
     print(f"  {path:<{width}}  {version}")
@@ -62,23 +55,19 @@ if broken:
     sys.exit(1)
 
 if len(versions) != 1:
-    print("\nверсии разошлись — обновлённый плагин не доедет до установленных копий")
+    print("\nversions differ — installed copies will miss the update")
     sys.exit(1)
 
 version = versions.pop()
 
 if not SEMVER.match(version):
-    print(f"\n{version!r} — не semver вида X.Y.Z")
+    print(f"\n{version!r} — not X.Y.Z SemVer")
     sys.exit(1)
 
-changelog = ROOT / "CHANGELOG.md"
-if not changelog.exists():
-    print("\nCHANGELOG.md отсутствует")
-    sys.exit(1)
+for filename in ("CHANGELOG.md", "CHANGELOG.ru.md"):
+    changelog = ROOT / filename
+    if not changelog.exists() or f"## {version}" not in changelog.read_text(encoding="utf-8"):
+        print(f"\nMissing entry in {filename}: '## {version}' — version lacks release notes")
+        sys.exit(1)
 
-if f"## {version}" not in changelog.read_text(encoding="utf-8"):
-    print(f"\nв CHANGELOG.md нет записи '## {version}' — версия без описания "
-          "изменений для потребителя равна её отсутствию")
-    sys.exit(1)
-
-print(f"\nверсии совпадают: {version}, запись в CHANGELOG есть")
+print(f"\nversions match: {version}, changelog entry present")
