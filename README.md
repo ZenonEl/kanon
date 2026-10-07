@@ -1,6 +1,7 @@
 # kanon
 
 [![Version](https://img.shields.io/badge/version-0.13.0-blue.svg)](CHANGELOG.md)
+[![CI](https://github.com/ZenonEl/kanon/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ZenonEl/kanon/actions/workflows/ci.yml)
 [![Code license](https://img.shields.io/badge/code-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![Docs license](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](SPEC/LICENSE)
 
