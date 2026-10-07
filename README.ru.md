@@ -1,4 +1,4 @@
-# kanon
+# <img src="assets/brand/kanon-logo.png" width="64" height="64" alt=""> kanon
 
 [![Версия](https://img.shields.io/badge/version-0.13.0-blue.svg)](CHANGELOG.ru.md)
 [![CI](https://github.com/ZenonEl/kanon/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ZenonEl/kanon/actions/workflows/ci.yml)
@@ -14,6 +14,8 @@ Kanon превращает задачу агента в чеклист приё�
 
 Это плагин для Claude Code и Codex с небольшим Python CLI. Название происходит
 от греческого κανών — измерительной линейки плотника.
+
+![Kanon: исследования, вопросы и ограничения становятся критериями приёмки до начала работы.](assets/brand/kanon-social-preview.png)
 
 ## Зачем
 

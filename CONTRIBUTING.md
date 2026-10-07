@@ -13,7 +13,7 @@ not a reason to quietly weaken the contract. Concepts explain the choices.
 Agent instructions, code comments/docstrings and normative contracts are English.
 Human guides have English primary and Russian translations. Checklist prose and
 agent conversation follow the user's language; quoted evidence stays verbatim.
-Runtime messages and generated indexes default to Russian. Keep EN/RU aliases
+Runtime messages and generated indexes default to English. Keep EN/RU aliases
 and canonical ASCII fields stable.
 
 `SPEC/`, `docs/` and `CONTRIBUTING*.md` use CC BY-SA 4.0. Other paths use
